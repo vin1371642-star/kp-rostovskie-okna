@@ -123,8 +123,10 @@ export async function printKp(kp, items) {
   const list = Array.isArray(items) ? items : [];
   const { org, settings } = await loadContext(kp);
 
-  // renderDocument уже включает DOC_STYLE; делаем пути ассетов абсолютными.
-  const docHtml = absolutizeAssets(renderDocument(kp, list, settings, org));
+  // Пути ассетов оставляем относительными (assets/…); резолвим их через <base> окна печати.
+  // Так логотип/фото работают и на localhost, и по ссылке (которая лежит в подпапке /kp-rostovskie-okna/).
+  const docHtml = renderDocument(kp, list, settings, org);
+  const baseHref = new URL('.', location.href).href; // каталог текущей страницы приложения
 
   const win = window.open('', '_blank');
   if (!win) {
@@ -138,6 +140,7 @@ export async function printKp(kp, items) {
   win.document.open();
   win.document.write(`<!DOCTYPE html><html lang="ru"><head>
     <meta charset="utf-8">
+    <base href="${baseHref}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Коммерческое предложение — Ростовские окна</title>
     <style>html,body{ margin:0; padding:0; background:#fff; }</style>
