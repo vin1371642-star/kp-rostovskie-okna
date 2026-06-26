@@ -54,6 +54,15 @@ function renderNav(){
     else if (r === 'set') toast('Пароль администратора задан, режим включён');
     else if (r === 'ok') toast('Режим администратора включён');
   };
+  updateFooter();
+}
+
+// Нижняя подпись сайдбара показывает версию данных (совпадает с «Текущая версия публикации»).
+function updateFooter(){
+  const f = document.querySelector('#sidebar .side-foot');
+  if (!f) return;
+  const pv = (state.settings && state.settings.published_version) || 0;
+  f.textContent = pv ? ('Данные: v' + pv + ' · прил. v0.1') : 'v0.1 · данные не загружены';
 }
 function renderView(){
   const root = document.getElementById('view');
