@@ -141,9 +141,9 @@ function sizeText(s) {
 
 // Ячейка эскиза: картинка (sketch_img) либо плейсхолдер-плашка / прочерк.
 function sketchCell(item, isService, big) {
-  const w = big ? 56 : 50;
-  const h = big ? 44 : 38;
-  const fz = big ? 8 : 7;
+  const w = big ? 120 : 110;
+  const h = big ? 92 : 84;
+  const fz = big ? 10 : 9;
   if (item && val(item.sketch_img)) {
     return `<img src="${e(item.sketch_img)}" alt="эскиз" style="width:${w}px;height:${h}px;object-fit:contain;margin:0 auto;display:block;border:1px solid #e4e1dd;background:#fff;">`;
   }
@@ -196,7 +196,7 @@ function tableHead(isService, showSketch, variant) {
   const th = (extra, align, text) =>
     `<th style="padding:${align === 'left' ? padL : pad};font-family:Cuprum,sans-serif;font-weight:700;font-size:${fz};letter-spacing:${ls};text-transform:uppercase;color:#fff;text-align:${align};${extra}">${text}</th>`;
   const wNo = big ? '32px' : '28px';
-  const wSk = big ? '72px' : '64px';
+  const wSk = big ? '136px' : '126px';
   const wMid = big ? '80px' : '74px';
   const wQty = big ? '50px' : '46px';
   const wUnit = big ? '44px' : '46px';
@@ -300,11 +300,26 @@ function sectionTable(title, rows, totalLabel, total, isService, showSketch, var
 // Блок подписи + печать (М.П.)
 // ---------------------------------------------------------------------------
 
+// Поправка масштаба печати/подписи под реальные PNG конкретных организаций
+// (в каждом файле штамп/подпись занимают разную долю картинки → визуально разный размер).
+// stamp/sign — множители размера; signDrop — на сколько px опустить подпись
+// (компенсация пустого поля снизу в PNG, чтобы чернила лежали на линии).
+function orgMediaScale(org) {
+  const name = String((org && org.name) || '').toLowerCase();
+  if (name.includes('мизанова')) return { stamp: 1.4, sign: 1, signDrop: 0 }; // И.А.: печать крупнее (как у Ростока)
+  if (name.includes('мизанов'))  return { stamp: 1.8, sign: 1, signDrop: 0 }; // Р.В.: печать крупнее; подпись — обычный размер
+  return { stamp: 1, sign: 1, signDrop: 0 };                                  // Росток и прочие — без поправки
+}
+
 function stampBlock(org, size, label) {
   const o = org || {};
+  const sc = orgMediaScale(o).stamp;
+  // Масштаб печати — через transform: визуально крупнее, но место в разметке (size×size)
+  // не меняется, поэтому строки во ВСЕХ КП и у всех организаций выровнены одинаково.
+  const tf = sc !== 1 ? `transform:scale(${sc});transform-origin:center center;` : '';
   if (val(o.stamp_img)) {
     return `<div style="display:flex;flex-direction:column;align-items:center;gap:9px;">
-      <img src="${e(o.stamp_img)}" alt="Печать" style="width:${size}px;height:${size}px;object-fit:contain;">
+      <img src="${e(o.stamp_img)}" alt="Печать" style="width:${size}px;height:${size}px;object-fit:contain;${tf}">
       ${label ? `<div style="font-family:Montserrat,sans-serif;font-size:9px;color:#b6b2ae;letter-spacing:.08em;text-transform:uppercase;">${label}</div>` : ''}
     </div>`;
   }
@@ -312,14 +327,6 @@ function stampBlock(org, size, label) {
     <div style="width:${size}px;height:${size}px;border:2px dashed #cdb4b1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#c5a8a5;font-family:ui-monospace,Menlo,monospace;font-size:${size > 100 ? 11 : 10}px;">М.П.</div>
     ${label ? `<div style="font-family:Montserrat,sans-serif;font-size:9px;color:#b6b2ae;letter-spacing:.08em;text-transform:uppercase;">${label}</div>` : ''}
   </div>`;
-}
-
-function signatureLine(org) {
-  const o = org || {};
-  if (val(o.signature_img)) {
-    return `<img src="${e(o.signature_img)}" alt="Подпись" style="height:46px;width:auto;display:block;margin-bottom:2px;">`;
-  }
-  return '';
 }
 
 // ---------------------------------------------------------------------------
@@ -535,8 +542,10 @@ function renderPremium(kp, items, settings, org) {
     <div data-keep style="display:flex;justify-content:space-between;align-items:flex-end;gap:30px;margin-top:30px;">
       <div style="flex:1;max-width:340px;">
         <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#6b6a68;line-height:1.6;margin-bottom:32px;">${signCaption}</div>
-        ${signatureLine(o)}
-        <div style="border-bottom:1.5px solid #2B2A29;"></div>
+        <div style="position:relative;height:${Math.max(Math.round(46 * orgMediaScale(o).sign), 34)}px;">
+          ${val(o.signature_img) ? `<img src="${e(o.signature_img)}" alt="Подпись" style="position:absolute;left:14px;bottom:${1 - orgMediaScale(o).signDrop}px;height:${Math.round(46 * orgMediaScale(o).sign)}px;width:auto;max-width:94%;">` : ''}
+          <div style="position:absolute;left:0;right:0;bottom:0;border-bottom:1.5px solid #2B2A29;"></div>
+        </div>
         <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.06em;text-transform:uppercase;">Подпись · ${e(orgName)}</div>
       </div>
       ${stampBlock(o, 118, 'печать продавца')}
@@ -644,13 +653,14 @@ function renderLegal(kp, items, settings, org) {
   }
 
   // Подписи.
-  const directorTitle = 'Директор ' + orgName;
+  // «Директор» — только для юрлица (ООО). У ИП — просто наименование (ИП не имеет директора).
+  const directorTitle = String(orgName).toLowerCase().includes('ооо') ? ('Директор ' + orgName) : orgName;
   const sellerSign = `<div>
       <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:4px;">Продавец</div>
       <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#2B2A29;font-weight:600;">${e(directorTitle)}</div>
       <div style="display:flex;align-items:flex-end;gap:18px;margin-top:30px;">
-        <div style="flex:1;border-bottom:1.5px solid #2B2A29;height:30px;position:relative;">${val(o.signature_img) ? `<img src="${e(o.signature_img)}" alt="" style="position:absolute;bottom:2px;left:10px;height:40px;width:auto;">` : ''}</div>
-        ${stampBlock(o, 86, '')}
+        <div style="flex:1;border-bottom:1.5px solid #2B2A29;height:30px;position:relative;">${val(o.signature_img) ? `<img src="${e(o.signature_img)}" alt="" style="position:absolute;bottom:${2 - orgMediaScale(o).signDrop}px;left:10px;height:${Math.round(40 * orgMediaScale(o).sign)}px;width:auto;">` : ''}</div>
+        ${stampBlock(o, 118, '')}
       </div>
       <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.04em;">подпись / ${e(val(o.name, ''))}</div>
     </div>`;
@@ -660,7 +670,7 @@ function renderLegal(kp, items, settings, org) {
         <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#2B2A29;font-weight:600;">${e(buyerName)}</div>
         <div style="display:flex;align-items:flex-end;gap:18px;margin-top:30px;">
           <div style="flex:1;border-bottom:1.5px solid #2B2A29;height:30px;"></div>
-          <div style="width:86px;height:86px;flex:none;border:2px dashed #c9c6c2;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#b6b3af;font-family:ui-monospace,Menlo,monospace;font-size:10px;">М.П.</div>
+          <div style="width:118px;height:118px;flex:none;border:2px dashed #c9c6c2;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#b6b3af;font-family:ui-monospace,Menlo,monospace;font-size:11px;">М.П.</div>
         </div>
         <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.04em;">подпись / Ф. И. О.</div>
       </div>`

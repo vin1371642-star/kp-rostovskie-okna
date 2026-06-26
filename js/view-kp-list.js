@@ -1,6 +1,6 @@
 // Экран «Мои КП» — список коммерческих предложений.
 import { setRoute, state } from './store.js';
-import { money, fmtDate, escapeHtml, toast, modal } from './util.js';
+import { money, fmtDate, escapeHtml, toast } from './util.js';
 import { listKp, newKp, duplicateKp, deleteKp, exportKpFile, importKpFile, setStatus } from './storage-kp.js';
 import { dbAll } from './db.js';
 import { computeKpTotals } from './calc.js';
@@ -188,11 +188,6 @@ function buildActions(root, kp){
   open.onclick = () => setRoute('constructor', { id: kp.id });
   box.appendChild(open);
 
-  const send = mkBtn('Отправить', 'btn btn-sm');
-  send.title = 'Отправить клиенту в WhatsApp или на почту';
-  send.onclick = () => openSendModal(root, kp);
-  box.appendChild(send);
-
   const dup = mkBtn('Дублировать', 'btn btn-sm');
   dup.onclick = async () => {
     if (dup.disabled) return;
@@ -252,44 +247,6 @@ function buildStatusCell(root, kp){
   };
   cell.appendChild(sel);
   return cell;
-}
-
-// ---------- Отправка клиенту ----------
-function normalizePhone(raw){
-  let d = String(raw || '').replace(/\D/g, '');
-  if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
-  if (d.length === 10) d = '7' + d;          // без кода страны → Россия
-  return d.length >= 11 ? d : '';
-}
-
-function openSendModal(root, kp){
-  const no = kp.client_request_no ? ' №' + kp.client_request_no : '';
-  const mgrName = (kp.manager && kp.manager.name) ? kp.manager.name : '';
-  const phone = normalizePhone(kp.buyer && kp.buyer.phone);
-  const msg = `Здравствуйте! Направляю коммерческое предложение «Ростовские окна»${no}. `
-    + `Буду рад(а) ответить на любые вопросы.` + (mgrName ? ` С уважением, ${mgrName}.` : '');
-  const subject = 'Коммерческое предложение «Ростовские окна»' + no;
-  const waUrl = (phone ? `https://wa.me/${phone}` : 'https://wa.me/') + '?text=' + encodeURIComponent(msg);
-  const mailUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`;
-
-  const bg = modal(`
-    <div class="h2">Отправить клиенту</div>
-    <p class="muted" style="margin:-4px 0 14px">Сначала скачайте PDF (кнопка «Скачать .kp» / печать → «Сохранить как PDF») и прикрепите его в мессенджере вручную — ссылки откроют готовое сообщение.</p>
-    ${phone ? '' : '<p class="pill" style="margin-bottom:12px">У клиента не указан телефон — WhatsApp откроется без получателя</p>'}
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-red" data-send="wa">WhatsApp</button>
-      <button class="btn" data-send="mail">Почта (e-mail)</button>
-      <span style="flex:1"></span>
-      <button class="btn" data-send="close">Закрыть</button>
-    </div>`);
-  const finishSent = async () => {
-    try { await setStatus(kp.id, 'sent'); kp.status = 'sent'; } catch (e){ console.error('[kp-list] sent', e); }
-    bg.remove();
-    build(root);
-  };
-  bg.querySelector('[data-send="wa"]').onclick = () => { window.open(waUrl, '_blank'); finishSent(); };
-  bg.querySelector('[data-send="mail"]').onclick = () => { window.location.href = mailUrl; finishSent(); };
-  bg.querySelector('[data-send="close"]').onclick = () => bg.remove();
 }
 
 // ---------- Пустое состояние / онбординг ----------
