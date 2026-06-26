@@ -3,14 +3,13 @@
 // + агентское вознаграждение. Сотрудники видят упрощённый вид; админ (по паролю) —
 // полный вид и редактор самих формул (текстовые выражения, живой пересчёт).
 import { money2, num, el, toast } from './util.js';
-import { state, saveSettings } from './store.js';
+import { state, saveSettings, enterAdminMode, exitAdminMode } from './store.js';
 
 // Локальное состояние ввода (живёт между перерисовками).
 const inp = { rate: 5, base: 0, goods: 0, mount: 0, agent: 0 };
 
-// Разблокировка админ-режима — на сессию (сбрасывается при перезагрузке).
-let adminUnlocked = false;
-let workFormulas = null; // рабочая копия формул при правке админом
+// Режим администратора — общий (state.adminMode). Рабочая копия формул при правке админом:
+let workFormulas = null;
 
 function n(v){ const x = Number(v); return Number.isFinite(x) ? x : 0; }
 function pct2(x){ return Number.isFinite(x) ? (Math.round(x * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' %' : '—'; }
@@ -112,7 +111,7 @@ export function renderDiscount(root){
   root.appendChild(wrap);
 
   // В админ-режиме рядом с подписями показываем имя переменной формулы (goods, saleGoods…).
-  const vTag = name => (adminUnlocked && name) ? ` <span class="disc-var">${name}</span>` : '';
+  const vTag = name => (state.adminMode && name) ? ` <span class="disc-var">${name}</span>` : '';
 
   // ── Ввод ──
   const cIn = el('<div class="card"></div>');
@@ -154,10 +153,10 @@ export function renderDiscount(root){
   const row = (lab, val, varName, cls) => `<div class="disc-row"><span class="lab">${lab}${vTag(varName)}</span><span class="v ${cls || ''}">${val}</span></div>`;
 
   function paint(){
-    const t = computeDiscount(inp, adminUnlocked ? workFormulas : null);
+    const t = computeDiscount(inp, state.adminMode ? workFormulas : null);
     const discCls = t.discountPct < 0 ? 'disc-neg' : '';
     let html = '';
-    if (adminUnlocked){
+    if (state.adminMode){
       html += `<div class="disc-grp">Итого для клиента (с НДС)</div><div class="disc-rows">
         ${row('Изделия', m2(t.goods), 'goods')}${row('Монтаж', m2(t.mount), 'mount')}${row('Итого', m2(t.total), 'total')}</div>
         <div class="disc-grp">НДС</div><div class="disc-rows">
@@ -174,7 +173,7 @@ export function renderDiscount(root){
 
   function buildEditor(){
     editorHost.innerHTML = '';
-    if (!adminUnlocked) return;
+    if (!state.adminMode) return;
     const card = el('<div class="card"></div>');
     card.appendChild(el('<div class="h2">Формулы расчёта (админ)</div>'));
     card.appendChild(el('<p class="muted" style="margin:0 0 10px">Переменные: <b>rate, base, goods, mount, agentPct</b> и вычисленные выше. Можно <b>+ − * / ( )</b>, сравнение и тернарник (напр. <code>rate==22 ? x : y</code>), функции min/max/abs/round. Изменения применяются сразу; «Сохранить» — чтобы записать и затем раздать сотрудникам по ссылке.</p>'));
@@ -210,28 +209,24 @@ export function renderDiscount(root){
 
   function buildAdminBar(){
     adminBar.innerHTML = '';
-    if (adminUnlocked){
+    if (state.adminMode){
       const lock = el('<button class="disc-flink">Выйти из режима администратора</button>');
-      lock.onclick = () => { adminUnlocked = false; workFormulas = null; renderDiscount(root); };
+      lock.onclick = () => exitAdminMode(); // эмитит перерисовку
       adminBar.appendChild(el('<span class="muted" style="font-size:12.5px">🔓 Режим администратора</span>'));
       adminBar.appendChild(lock);
     } else {
       const unlock = el('<button class="disc-flink">Режим администратора</button>');
-      unlock.onclick = () => {
-        const pass = (state.settings && state.settings.admin_password) || '';
-        if (!pass){ toast('Задайте пароль администратора в разделе «Админ»'); return; }
-        const entered = prompt('Пароль администратора:');
-        if (entered == null) return;
-        if (entered !== pass){ toast('Неверный пароль'); return; }
-        adminUnlocked = true;
-        workFormulas = savedFormulas();
-        renderDiscount(root);
+      unlock.onclick = async () => {
+        const r = await enterAdminMode();
+        if (r === 'wrong') toast('Неверный пароль');
+        else if (r === 'nolocal') toast('Режим администратора доступен только в локальной версии');
+        else if (r === 'set') toast('Пароль администратора задан, режим включён');
       };
       adminBar.appendChild(unlock);
     }
   }
 
-  if (adminUnlocked && !workFormulas) workFormulas = savedFormulas();
+  if (state.adminMode){ if (!workFormulas) workFormulas = savedFormulas(); } else { workFormulas = null; }
   syncSeg();
   paint();
   buildEditor();

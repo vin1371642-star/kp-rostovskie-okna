@@ -1,7 +1,7 @@
 // Состояние приложения — общий контракт. НЕ редактировать в модулях-агентах.
 import { dbGet, dbPut } from './db.js';
 
-export const state = { route: 'kp-list', params: {}, settings: null, editingKpId: null };
+export const state = { route: 'kp-list', params: {}, settings: null, editingKpId: null, adminMode: false };
 const subs = new Set();
 
 export function subscribe(fn){ subs.add(fn); return () => subs.delete(fn); }
@@ -27,6 +27,29 @@ export async function loadSettings(){
   return state.settings;
 }
 export async function saveSettings(s){ s.id = 'app'; await dbPut('settings', s); state.settings = s; emit(); return s; }
+
+// Вход в режим администратора (полный «Админ» + редактор формул) по паролю.
+// На публичной ссылке без заданного пароля — недоступен (сотрудники остаются без «Админ»).
+// Возвращает: 'ok' | 'set' | 'wrong' | 'cancel' | 'nolocal'.
+export async function enterAdminMode(){
+  const pass = (state.settings && state.settings.admin_password) || '';
+  const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+  if (!pass){
+    if (!isLocal) return 'nolocal'; // на ссылке первичная настройка пароля недоступна
+    const set = prompt('Задайте пароль администратора:');
+    if (set == null || !set.trim()) return 'cancel';
+    state.adminMode = true;
+    const s = Object.assign({}, state.settings, { admin_password: set.trim() }); s.id = 'app';
+    await saveSettings(s); // эмитит перерисовку
+    return 'set';
+  }
+  const entered = prompt('Пароль администратора:');
+  if (entered == null) return 'cancel';
+  if (entered.trim() !== pass) return 'wrong';
+  state.adminMode = true; emit();
+  return 'ok';
+}
+export function exitAdminMode(){ state.adminMode = false; emit(); }
 
 export function defaultSettings(){
   return {
