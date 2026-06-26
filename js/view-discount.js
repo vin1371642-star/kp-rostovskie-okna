@@ -1,5 +1,5 @@
 // view-discount.js — вкладка «Расчёт скидки».
-// Методика файла базы знаний «НДС 2026.xlsx»: скидка/маржа при продаже юрлицам с НДС
+// Методика файла базы знаний «НДС 2026.xlsx»: скидка при продаже юрлицам с НДС
 // + агентское вознаграждение. Сотрудники видят упрощённый вид; админ (по паролю) —
 // полный вид и редактор самих формул (текстовые выражения, живой пересчёт).
 import { money2, num, el, toast } from './util.js';
@@ -35,7 +35,7 @@ const DEFAULT_EXPR = {
 const LABEL = {
   total:'Итого для клиента (с НДС)', vatGoods:'НДС в изделиях', vatMount:'НДС в монтаже', vatBuy:'НДС в закупке (входящий)',
   agentSum:'Вознаграждение агента', saleGoods:'Для показателей — изделия', saleMount:'Для показателей — монтаж',
-  saleTotal:'Для показателей — итого', discountPct:'Скидка / маржа к базе, %', contractGoods:'Для договора — изделия',
+  saleTotal:'Для показателей — итого', discountPct:'Скидка к базе, %', contractGoods:'Для договора — изделия',
   contractMount:'Для договора — монтаж', contractTotal:'Для договора — итого', contractVat:'Для договора — в т.ч. НДС',
 };
 const FUNCS = { min:Math.min, max:Math.max, abs:Math.abs, round:(x,d=2)=>{ const p=Math.pow(10, d||0); return Math.round(x*p)/p; } };
@@ -105,7 +105,7 @@ export function renderDiscount(root){
   injectStyles();
   root.innerHTML = '';
   root.appendChild(el('<div class="h1">Расчёт скидки</div>'));
-  root.appendChild(el('<p class="muted" style="margin:0 0 16px">Скидка/маржа при продаже юрлицам с НДС и агентское вознаграждение. По методике «НДС 2026». Введите исходные данные.</p>'));
+  root.appendChild(el('<p class="muted" style="margin:0 0 16px">Скидка при продаже юрлицам с НДС и агентское вознаграждение. По методике «НДС 2026». Введите исходные данные.</p>'));
 
   const wrap = el('<div class="disc-wrap"></div>');
   root.appendChild(wrap);
@@ -167,7 +167,7 @@ export function renderDiscount(root){
       <div class="disc-grp">Для договора</div><div class="disc-rows">
         ${row('Изделия', m2(t.contractGoods), 'contractGoods')}${row('Монтаж', m2(t.contractMount), 'contractMount')}${row('ИТОГО', m2(t.contractTotal), 'contractTotal')}${row('в т.ч. НДС ' + num(t.rate) + '%', m2(t.contractVat), 'contractVat')}</div>
       <div class="disc-grp">Агент</div><div class="disc-rows">${row('Вознаграждение агента', m2(t.agentSum), 'agentSum')}</div>
-      <div class="disc-big"><span class="lab">Скидка / маржа к базе${vTag('discountPct')}</span><span class="v ${discCls}">${pct2(t.discountPct)}</span></div>`;
+      <div class="disc-big"><span class="lab">Скидка к базе${vTag('discountPct')}</span><span class="v ${discCls}">${pct2(t.discountPct)}</span></div>`;
     out.innerHTML = html;
   }
 
