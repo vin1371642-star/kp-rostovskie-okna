@@ -2,7 +2,7 @@
 // Эталон (код + статика) кэшируется здесь; личные данные живут в IndexedDB и SW их не трогает.
 // Стратегии: навигация — network-first (свежий код, офлайн-фолбэк на index.html);
 // статика (js/css/шрифты/картинки) — cache-first; api/ и shared.json — только сеть (никогда не кэшируем).
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'kp-rostov-' + VERSION;
 
 // Оболочка приложения — кладём в кэш при установке (гарантированный офлайн-старт).
@@ -68,25 +68,25 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin) return;  // сторонние ресурсы — как есть
   if (isApi(url)) return;                            // публикация/общий слой — всегда из сети
 
-  // Навигация (открытие/переход): network-first, офлайн → кэш оболочки.
-  if (req.mode === 'navigate'){
+  const putCache = resp => {
+    if (resp && resp.ok && resp.type === 'basic'){ const copy = resp.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    return resp;
+  };
+
+  // Код приложения (навигация, js/css/manifest) — NETWORK-FIRST: всегда свежая версия онлайн,
+  // офлайн → из кэша. Это убирает «залипание» старого кода у сотрудников.
+  const isCode = req.mode === 'navigate' || /\.(js|css)$/.test(url.pathname) || url.pathname.endsWith('manifest.webmanifest');
+  if (isCode){
     e.respondWith(
-      fetch(req).catch(() => caches.match('index.html').then(r => r || caches.match('./')))
+      fetch(req).then(putCache).catch(() =>
+        caches.match(req).then(r => r || (req.mode === 'navigate' ? caches.match('index.html').then(x => x || caches.match('./')) : undefined))
+      )
     );
     return;
   }
 
-  // Статика: cache-first, иначе сеть (и доложить в кэш для будущего офлайна).
+  // Прочая статика (шрифты, картинки) — cache-first (она не меняется между версиями).
   e.respondWith(
-    caches.match(req).then(hit => {
-      if (hit) return hit;
-      return fetch(req).then(resp => {
-        if (resp && resp.ok && resp.type === 'basic'){
-          const copy = resp.clone();
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
-        return resp;
-      });
-    })
+    caches.match(req).then(hit => hit || fetch(req).then(putCache))
   );
 });

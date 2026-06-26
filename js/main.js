@@ -73,10 +73,24 @@ function renderView(){
 
 subscribe(() => { renderNav(); renderView(); });
 
-// Service Worker — офлайн-кэш (только по http/https, не из file://).
+// Service Worker — офлайн-кэш + АВТО-ОБНОВЛЕНИЕ: новый SW сам активируется и перезагружает страницу,
+// поэтому сотрудники получают свежую версию без ручной чистки кэша.
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swReloaded) return; swReloaded = true; location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(e => console.warn('[sw]', e));
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      reg.update().catch(() => {});
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
+        });
+      });
+    }).catch(e => console.warn('[sw]', e));
   });
 }
 
