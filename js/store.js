@@ -28,24 +28,12 @@ export async function loadSettings(){
 }
 export async function saveSettings(s){ s.id = 'app'; await dbPut('settings', s); state.settings = s; emit(); return s; }
 
-// Вход в режим администратора (полный «Админ» + редактор формул) по паролю.
-// На публичной ссылке без заданного пароля — недоступен (сотрудники остаются без «Админ»).
-// Возвращает: 'ok' | 'set' | 'wrong' | 'cancel' | 'nolocal'.
+// Вход в режим администратора (полный «Админ» + редактор формул).
+// На СВОЁМ компьютере (localhost) — открывается сразу, без пароля. На публичной ссылке
+// (github.io) недоступен, поэтому сотрудники «Админ» не видят. Возвращает: 'ok' | 'nolocal'.
 export async function enterAdminMode(){
-  const pass = (state.settings && state.settings.admin_password) || '';
   const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
-  if (!pass){
-    if (!isLocal) return 'nolocal'; // на ссылке первичная настройка пароля недоступна
-    const set = prompt('Задайте пароль администратора:');
-    if (set == null || !set.trim()) return 'cancel';
-    state.adminMode = true;
-    const s = Object.assign({}, state.settings, { admin_password: set.trim() }); s.id = 'app';
-    await saveSettings(s); // эмитит перерисовку
-    return 'set';
-  }
-  const entered = prompt('Пароль администратора:');
-  if (entered == null) return 'cancel';
-  if (entered.trim() !== pass) return 'wrong';
+  if (!isLocal) return 'nolocal';
   state.adminMode = true; emit();
   return 'ok';
 }
