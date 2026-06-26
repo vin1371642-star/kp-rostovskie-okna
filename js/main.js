@@ -73,25 +73,15 @@ function renderView(){
 
 subscribe(() => { renderNav(); renderView(); });
 
-// Service Worker — офлайн-кэш + АВТО-ОБНОВЛЕНИЕ: новый SW сам активируется и перезагружает страницу,
-// поэтому сотрудники получают свежую версию без ручной чистки кэша.
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  let swReloaded = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (swReloaded) return; swReloaded = true; location.reload();
-  });
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(reg => {
-      reg.update().catch(() => {});
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
-        if (!nw) return;
-        nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
-        });
-      });
-    }).catch(e => console.warn('[sw]', e));
-  });
+// Офлайн-кэш (service worker) отключён — приложение всегда грузится свежим из сети.
+// Снимаем любой ранее зарегистрированный SW, чтобы старый кэш не залипал.
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations()
+    .then(rs => rs.forEach(r => r.unregister()))
+    .catch(() => {});
+}
+if (window.caches && caches.keys){
+  caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {}); // чистим старые кэши приложения
 }
 
 (async () => {
