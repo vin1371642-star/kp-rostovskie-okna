@@ -103,4 +103,5 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
   } catch (e) { console.error('[boot]', e); }
   renderNav();
   renderView();
+  try { sessionStorage.removeItem('kp-selfheal'); } catch (e) {} // успешный старт — снять флаг самовосстановления
 })();

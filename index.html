@@ -24,6 +24,25 @@
   </aside>
   <main id="view"></main>
 </div>
+<script>
+// Авто-восстановление при зависшем service worker: если приложение не загрузилось за 5 c
+// (меню пустое), один раз за сессию сбрасываем SW и кэш и перезагружаемся.
+// IndexedDB (личные КП) НЕ трогаем.
+(function(){
+  setTimeout(function(){
+    if (document.querySelector('#nav button')) return;       // приложение загрузилось — всё ок
+    if (sessionStorage.getItem('kp-selfheal')) return;        // уже пробовали в этой сессии
+    sessionStorage.setItem('kp-selfheal', '1');
+    var fin = function(){ location.reload(); };
+    var jobs = [];
+    try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations)
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); })); } catch(e){}
+    try { if (window.caches && caches.keys)
+      jobs.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); })); } catch(e){}
+    Promise.all(jobs).then(fin, fin);
+  }, 5000);
+})();
+</script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
