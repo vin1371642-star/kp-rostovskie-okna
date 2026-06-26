@@ -1,5 +1,5 @@
 // Экран «Организации-продавцы» — CRUD реквизитов продавцов для подстановки в КП.
-import { dbAll, dbPut, dbDel, uid } from './db.js';
+import { dbAll, dbGet, dbPut, dbDel, uid } from './db.js';
 import { toast, modal, escapeHtml, readFileAsDataURL, el, watchPasteImage } from './util.js';
 import { state, saveSettings } from './store.js';
 import { publishShared, pullShared } from './publish.js';
@@ -277,9 +277,12 @@ function buildPublishCard(host){
     if (!pw){ toast('Задайте пароль доступа'); return; }
     status.textContent = 'Публикую…';
     try {
-      const cur = Object.assign({}, state.settings, { access_password: pw }); cur.id = 'app';
+      // Флушим текущие настройки в БД, но НЕ затираем опубликованную версию — её ведёт publishShared.
+      const dbS = (await dbGet('settings', 'app')) || {};
+      const cur = Object.assign({}, state.settings, { access_password: pw, published_version: dbS.published_version }); cur.id = 'app';
       await saveSettings(cur);
       const v = await publishShared(pw);
+      if (state.settings) state.settings.published_version = v; // синхронизируем версию в памяти
       verEl.textContent = 'v' + v; status.textContent = 'Опубликовано · v' + v;
       toast('Опубликовано по ссылке: v' + v);
     } catch (e){ console.error('[publish]', e); status.textContent = 'Ошибка'; toast(e.message || 'Ошибка публикации'); }
