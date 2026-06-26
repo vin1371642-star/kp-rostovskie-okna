@@ -24,6 +24,31 @@ function val(v, fallback) {
   return s || (fallback == null ? '' : fallback);
 }
 
+// Настраиваемые подписи (ярлыки) документа. Переопределяются в Настройках (settings.doc_labels).
+const DOC_LABELS = {
+  secProducts: 'Продукция', secServices: 'Услуги',
+  addr: 'Адрес объекта', valid: 'Действительно до',
+  seller: 'Продавец', buyer: 'Покупатель',
+  termProduce: 'Срок изготовления', termWarranty: 'Гарантия', termPayment: 'Условия оплаты',
+  colNum: '№', colName: 'Наименование / комплектация', colNameService: 'Наименование',
+  colSketch: 'Эскиз', colSize: 'Размер, мм', colBasis: 'Основание',
+  colQty: 'Кол-во', colUnit: 'Ед.', colPrice: 'Цена, ₽', colSum: 'Сумма, ₽',
+};
+// Метки, заданные в настройках, имеют приоритет (пустые — запасной вариант).
+let _labels = DOC_LABELS;
+function L(key){ const v = _labels[key]; return (v != null && String(v).trim()) ? v : (DOC_LABELS[key] || ''); }
+// Список ярлыков для редактора в Настройках: ключ + человекочитаемое описание.
+export const DOC_LABEL_FIELDS = [
+  ['secProducts', 'Раздел «Продукция»'], ['secServices', 'Раздел «Услуги»'],
+  ['addr', 'Адрес объекта'], ['valid', 'Действительно до'],
+  ['seller', 'Сторона «Продавец»'], ['buyer', 'Сторона «Покупатель»'],
+  ['termProduce', 'Условия: срок изготовления'], ['termWarranty', 'Условия: гарантия'], ['termPayment', 'Условия: оплата'],
+  ['colNum', 'Колонка №'], ['colName', 'Колонка «Наименование» (продукция)'], ['colNameService', 'Колонка «Наименование» (услуги)'],
+  ['colSketch', 'Колонка «Эскиз»'], ['colSize', 'Колонка «Размер»'], ['colBasis', 'Колонка «Основание»'],
+  ['colQty', 'Колонка «Кол-во»'], ['colUnit', 'Колонка «Ед.»'], ['colPrice', 'Колонка «Цена»'], ['colSum', 'Колонка «Сумма»'],
+];
+export const DOC_LABEL_DEFAULTS = DOC_LABELS;
+
 // Блок условий (Срок изготовления / Гарантия / Условия оплаты) из kp.terms.
 // Единый для всех вариантов документа, поэтому правки условий всегда видны в печати.
 function termsGrid(terms) {
@@ -32,9 +57,9 @@ function termsGrid(terms) {
     `<div><div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:7px;">${label}</div><span style="display:inline-block;font-family:Montserrat,sans-serif;font-size:13px;font-weight:700;color:#2B2A29;padding:0 6px;border-radius:2px;">${value}</span></div>`;
   return `<div style="padding:24px 16mm 0;">
     <div data-keep style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;border:1px solid #EDEDED;padding:16px 20px;background:#fcfbfa;">
-      ${col('Срок изготовления', e(val(t.produce, '5–7 рабочих дней')))}
-      ${col('Гарантия', e(val(t.warranty, 'до 10 лет')))}
-      ${col('Условия оплаты', eMulti(val(t.payment, 'предоплата 70%')))}
+      ${col(e(L('termProduce')), e(val(t.produce, '5–7 рабочих дней')))}
+      ${col(e(L('termWarranty')), e(val(t.warranty, 'до 10 лет')))}
+      ${col(e(L('termPayment')), eMulti(val(t.payment, 'предоплата 70%')))}
     </div>
   </div>`;
 }
@@ -124,7 +149,14 @@ function buyerFullRequisites(b) {
   if (val(x.inn)) innKpp.push('ИНН: ' + e(x.inn));
   if (val(x.kpp)) innKpp.push('КПП: ' + e(x.kpp));
   if (innKpp.length) lines.push(innKpp.join(' / '));
+  if (val(x.ogrn)) lines.push('ОГРН: ' + e(x.ogrn));
   if (val(x.address)) lines.push('Адрес: ' + e(x.address));
+  if (val(x.rs)) lines.push('Р/с: ' + e(x.rs));
+  if (val(x.bank)) lines.push('Банк: ' + e(x.bank));
+  const bikKs = [];
+  if (val(x.bik)) bikKs.push('БИК: ' + e(x.bik));
+  if (val(x.ks)) bikKs.push('К/с: ' + e(x.ks));
+  if (bikKs.length) lines.push(bikKs.join(' / '));
   const contact = [];
   if (val(x.phone)) contact.push(e(x.phone));
   if (val(x.email)) contact.push(e(x.email));
@@ -204,14 +236,14 @@ function tableHead(isService, showSketch, variant) {
   const wSum = big ? '92px' : '90px';
   const skHide = showSketch ? '' : 'display:none;';
   let cells = '';
-  cells += th(`width:${wNo};`, 'center', '№');
-  cells += th('', 'left', isService ? 'Наименование' : 'Наименование / комплектация');
-  cells += th(`width:${wSk};${skHide}`, 'center', 'Эскиз');
-  cells += th(`width:${wMid};`, 'center', isService ? 'Основание' : 'Размер, мм');
-  cells += th(`width:${wQty};`, 'center', 'Кол-во');
-  cells += th(`width:${wUnit};`, 'center', 'Ед.');
-  cells += th(`width:${wPrice};`, 'right', 'Цена, ₽');
-  cells += th(`width:${wSum};`, 'right', 'Сумма, ₽');
+  cells += th(`width:${wNo};`, 'center', e(L('colNum')));
+  cells += th('', 'left', e(isService ? L('colNameService') : L('colName')));
+  cells += th(`width:${wSk};${skHide}`, 'center', e(L('colSketch')));
+  cells += th(`width:${wMid};`, 'center', e(isService ? L('colBasis') : L('colSize')));
+  cells += th(`width:${wQty};`, 'center', e(L('colQty')));
+  cells += th(`width:${wUnit};`, 'center', e(L('colUnit')));
+  cells += th(`width:${wPrice};`, 'right', e(L('colPrice')));
+  cells += th(`width:${wSum};`, 'right', e(L('colSum')));
   return `<thead><tr style="background:#2B2A29;">${cells}</tr></thead>`;
 }
 
@@ -268,7 +300,7 @@ function sectionTotalRow(label, sum, showSketch, variant) {
   // Колонок до «Сумма»: №, Наименование, [Эскиз], Размер/Основание, Кол-во, Ед., Цена = 6 или 7.
   const span = showSketch ? 7 : 6;
   return `<tr style="background:#F6F5F4;">
-    <td colspan="${span}" style="padding:${pad};border-top:2px solid #2B2A29;text-align:right;font-family:Cuprum,sans-serif;font-weight:700;font-size:${labelFz};color:#2B2A29;text-transform:uppercase;letter-spacing:.03em;">${label}</td>
+    <td colspan="${span}" style="padding:${pad};border-top:2px solid #2B2A29;text-align:right;font-family:Cuprum,sans-serif;font-weight:700;font-size:${labelFz};color:#2B2A29;text-transform:uppercase;letter-spacing:.03em;">${e(label)}</td>
     <td style="padding:${pad};border-top:2px solid #2B2A29;text-align:right;font-family:Cuprum,sans-serif;font-weight:700;font-size:${sumFz};color:#2B2A29;white-space:nowrap;font-variant-numeric:tabular-nums;">${num(sum)}</td>
   </tr>`;
 }
@@ -281,7 +313,7 @@ function sectionTitle(text, variant) {
   const mt = big ? '30px' : '24px';
   return `<div style="display:flex;align-items:center;gap:12px;margin:${mt} 0 ${big ? '12px' : '10px'};break-after:avoid;">
     <span style="width:7px;height:${h};background:#B50900;display:inline-block;"></span>
-    <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${fz};letter-spacing:.02em;color:#2B2A29;text-transform:uppercase;">${text}</span>
+    <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${fz};letter-spacing:.02em;color:#2B2A29;text-transform:uppercase;">${e(text)}</span>
     <span style="flex:1;height:1px;background:#EDEDED;"></span>
   </div>`;
 }
@@ -457,7 +489,7 @@ function renderPremium(kp, items, settings, org) {
     </div>`;
   html += `<div style="padding:26px 16mm 0;display:flex;flex-wrap:wrap;gap:0;">
     <div style="padding-right:36px;border-right:1px solid #EDEDED;">${metaCol('№ предложения', e(no) + ' · от ' + e(dateLong(kp.date)), false)}</div>
-    <div style="padding:0 36px;border-right:1px solid #EDEDED;">${metaCol('Действительно до', e(fmtDate(kp.valid_until)) || '—', true)}</div>
+    <div style="padding:0 36px;border-right:1px solid #EDEDED;">${metaCol(e(L('valid')), e(fmtDate(kp.valid_until)) || '—', true)}</div>
     <div style="padding-left:36px;">${metaCol('Менеджер', e(mgrName) || '—', false)}</div>
   </div>`;
 
@@ -485,7 +517,7 @@ function renderPremium(kp, items, settings, org) {
       </div>
       ${objAddr ? `<div style="width:1px;background:#e2e0dd;"></div>
       <div style="flex:1.25;">
-        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:7px;">Адрес объекта</div>
+        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:7px;">${e(L('addr'))}</div>
         <div style="font-family:Montserrat,sans-serif;font-size:13.5px;color:#2B2A29;font-weight:600;line-height:1.5;">${eMulti(objAddr)}</div>
       </div>` : ''}
     </div>
@@ -493,8 +525,8 @@ function renderPremium(kp, items, settings, org) {
 
   // Таблицы.
   html += `<div style="padding:0 16mm;">`;
-  html += sectionTable('Продукция', products, 'Итого по разделу «Продукция»', totals.productSubtotal, false, showSketch, 'premium');
-  html += sectionTable('Услуги', services, 'Итого по разделу «Услуги»', totals.serviceSubtotal, true, showSketch, 'premium');
+  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium');
+  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'premium');
   html += `</div>`;
 
   // Итоги.
@@ -606,7 +638,7 @@ function renderLegal(kp, items, settings, org) {
   const partiesCols = isOferta ? '1fr 1fr' : '1fr';
   const sellerBlock = isOferta
     ? `<div style="padding:16px 18px;border-right:1px solid #E2E0DD;">
-        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#B50900;font-weight:700;margin-bottom:9px;">Продавец</div>
+        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#B50900;font-weight:700;margin-bottom:9px;">${e(L('seller'))}</div>
         <div style="font-family:Cuprum,sans-serif;font-weight:700;font-size:16px;color:#2B2A29;margin-bottom:9px;">${e(orgName)}</div>
         <div style="font-family:Montserrat,sans-serif;font-size:11px;color:#4a4846;line-height:1.75;">${orgFullRequisites(o).join('<br>')}</div>
       </div>`
@@ -618,7 +650,7 @@ function renderLegal(kp, items, settings, org) {
     <div data-keep style="display:grid;grid-template-columns:${partiesCols};border:1px solid #E2E0DD;">
       ${sellerBlock}
       <div style="padding:16px 18px;">
-        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#B50900;font-weight:700;margin-bottom:9px;">Покупатель</div>
+        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#B50900;font-weight:700;margin-bottom:9px;">${e(L('buyer'))}</div>
         <div style="font-family:Cuprum,sans-serif;font-weight:700;font-size:16px;color:#2B2A29;margin-bottom:9px;">${e(buyerName)}</div>
         ${buyerReq}
       </div>
@@ -628,16 +660,16 @@ function renderLegal(kp, items, settings, org) {
   // Адрес объекта / действительно до.
   html += `<div style="padding:16px 16mm 0;">
     <div data-keep style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px 28px;background:#F6F5F4;padding:16px 20px;border-left:4px solid #B50900;">
-      <div><div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:6px;">Адрес объекта монтажа</div><span style="font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:#2B2A29;padding:0 5px;border-radius:2px;">${e(objAddr) || '—'}</span></div>
-      <div><div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:6px;">Действительно до</div><span style="font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:#2B2A29;padding:0 5px;border-radius:2px;">${e(fmtDate(kp.valid_until)) || '—'}</span></div>
+      <div><div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:6px;">${e(L('addr'))}</div><span style="font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:#2B2A29;padding:0 5px;border-radius:2px;">${e(objAddr) || '—'}</span></div>
+      <div><div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:6px;">${e(L('valid'))}</div><span style="font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:#2B2A29;padding:0 5px;border-radius:2px;">${e(fmtDate(kp.valid_until)) || '—'}</span></div>
     </div>
   </div>`;
 
   // Таблицы.
   html += `<div style="padding:18px 16mm 0;">`;
-  html += sectionTable('Продукция', products, 'Итого по разделу «Продукция»', totals.productSubtotal, false, showSketch, 'legal');
+  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal');
   html += `<div style="height:0;"></div>`;
-  html += sectionTable('Услуги', services, 'Итого по разделу «Услуги»', totals.serviceSubtotal, true, showSketch, 'legal');
+  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'legal');
   html += `</div>`;
 
   // Итоги (с НДС).
@@ -653,26 +685,39 @@ function renderLegal(kp, items, settings, org) {
   }
 
   // Подписи.
-  // «Директор» — только для юрлица (ООО). У ИП — просто наименование (ИП не имеет директора).
-  const directorTitle = String(orgName).toLowerCase().includes('ооо') ? ('Директор ' + orgName) : orgName;
+  // Для ООО у подписи выводим должность руководителя; ФИО руководителя — в строке «подпись / …».
+  // У ИП директора нет — просто наименование.
+  const isOOO = /ооо|обществ/i.test(String(orgName));
+  const dirTitle = val(o.director_title, isOOO ? 'Директор' : '');
+  const dirName = val(o.director_name, '');
+  const signerLine = (isOOO && dirTitle)
+    ? `${e(orgName)}<br><span style="color:#5a5856;font-weight:500;">${e(dirTitle)}</span>`
+    : e(orgName);
+  const signerName = dirName || val(o.name, '');
   const sellerSign = `<div>
-      <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:4px;">Продавец</div>
-      <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#2B2A29;font-weight:600;">${e(directorTitle)}</div>
+      <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:4px;">${e(L('seller'))}</div>
+      <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#2B2A29;font-weight:600;line-height:1.5;min-height:36px;">${signerLine}</div>
       <div style="display:flex;align-items:flex-end;gap:18px;margin-top:30px;">
         <div style="flex:1;border-bottom:1.5px solid #2B2A29;height:30px;position:relative;">${val(o.signature_img) ? `<img src="${e(o.signature_img)}" alt="" style="position:absolute;bottom:${2 - orgMediaScale(o).signDrop}px;left:10px;height:${Math.round(40 * orgMediaScale(o).sign)}px;width:auto;">` : ''}</div>
         ${stampBlock(o, 118, '')}
       </div>
-      <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.04em;">подпись / ${e(val(o.name, ''))}</div>
+      <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.04em;">подпись / ${e(signerName)}</div>
     </div>`;
+  const buyerIsOOO = /ооо|обществ/i.test(String(buyerName));
+  const bDirTitle = val(buyer.director_title, buyerIsOOO ? 'Директор' : '');
+  const bDirName = val(buyer.director_name, '');
+  const buyerSignerLine = (buyerIsOOO && bDirTitle)
+    ? `${e(buyerName)}<br><span style="color:#5a5856;font-weight:500;">${e(bDirTitle)}</span>`
+    : e(buyerName);
   const buyerSign = isOferta
     ? `<div>
-        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:4px;">Покупатель</div>
-        <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#2B2A29;font-weight:600;">${e(buyerName)}</div>
+        <div style="font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:4px;">${e(L('buyer'))}</div>
+        <div style="font-family:Montserrat,sans-serif;font-size:12px;color:#2B2A29;font-weight:600;line-height:1.5;min-height:36px;">${buyerSignerLine}</div>
         <div style="display:flex;align-items:flex-end;gap:18px;margin-top:30px;">
           <div style="flex:1;border-bottom:1.5px solid #2B2A29;height:30px;"></div>
           <div style="width:118px;height:118px;flex:none;border:2px dashed #c9c6c2;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#b6b3af;font-family:ui-monospace,Menlo,monospace;font-size:11px;">М.П.</div>
         </div>
-        <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.04em;">подпись / Ф. И. О.</div>
+        <div style="font-family:Montserrat,sans-serif;font-size:10px;color:#9a9895;margin-top:6px;letter-spacing:.04em;">подпись / ${e(bDirName) || 'Ф. И. О.'}</div>
       </div>`
     : '';
   const signCols = isOferta ? '1fr 1fr' : '1fr';
@@ -692,6 +737,7 @@ function renderLegal(kp, items, settings, org) {
 
 export function renderDocument(kp, items, settings, org) {
   const k = kp || {};
+  _labels = Object.assign({}, DOC_LABELS, (settings && settings.doc_labels) || {}); // настраиваемые подписи
   const list = Array.isArray(items) ? items : [];
   const variant = k.doc_variant === 'kp' || k.doc_variant === 'oferta' ? k.doc_variant : 'premium';
 

@@ -7,7 +7,7 @@ export const SHARED_STORES = ['organizations', 'categories', 'components', 'prod
 // Ключ слияния для режима «Добавить новое»: компоненты — по стабильному code, остальное — по id.
 const MERGE_KEY = { components: 'code' };
 // Поля настроек, входящие в общий слой (manager/access_password/published_version — личные, не раздаём).
-const SHARED_SETTINGS_KEYS = ['default_markup', 'about', 'footer', 'columns_config', 'service_bases', 'service_items', 'terms_person', 'terms_legal'];
+const SHARED_SETTINGS_KEYS = ['default_markup', 'about', 'footer', 'columns_config', 'service_bases', 'service_items', 'terms_person', 'terms_legal', 'disc_formulas', 'doc_labels'];
 
 // Собрать общий слой в один объект.
 export async function buildSharedBundle(){

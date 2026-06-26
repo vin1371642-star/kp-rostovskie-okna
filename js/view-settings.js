@@ -3,6 +3,7 @@
 import { state, saveSettings } from './store.js';
 import { toast, readFileAsDataURL, el } from './util.js';
 import { importKpFile } from './storage-kp.js';
+import { DOC_LABEL_FIELDS, DOC_LABEL_DEFAULTS } from './doc-templates.js';
 
 // Стили модуля (инъекция один раз, префикс .set-).
 function injectStyles(){
@@ -28,6 +29,7 @@ function cloneSettings(src){
   base.footer = base.footer || {};
   base.terms_person = base.terms_person || {};
   base.terms_legal = base.terms_legal || {};
+  base.doc_labels = base.doc_labels || {};
   return base;
 }
 
@@ -95,6 +97,17 @@ export function renderSettings(root){
   cTermsL.appendChild(field('Гарантийные обязательства', s.terms_legal, 'warranty', { textarea: true, placeholder: 'Гарантия до 10 лет на изделия и монтажные работы…' }));
   cTermsL.appendChild(field('Условия и порядок оплаты', s.terms_legal, 'payment', { textarea: true, placeholder: 'Предоплата 70% — запуск в производство; остаток по факту монтажа…' }));
   root.appendChild(cTermsL);
+
+  // ── Подписи (ярлыки) в документе КП ────────────────────────────────
+  const cLabels = el('<div class="card"></div>');
+  cLabels.appendChild(el('<div class="h2">Подписи в документе КП</div>'));
+  cLabels.appendChild(el('<p class="muted">Переименование подписей в печатном КП: разделы, колонки таблицы, поля и стороны. Пусто — берётся стандартное название. Раздаётся сотрудникам по ссылке.</p>'));
+  const gLabels = el('<div class="set-grid"></div>');
+  DOC_LABEL_FIELDS.forEach(([key, desc]) => {
+    gLabels.appendChild(field(desc, s.doc_labels, key, { placeholder: DOC_LABEL_DEFAULTS[key] || '' }));
+  });
+  cLabels.appendChild(gLabels);
+  root.appendChild(cLabels);
 
   // ── Данные (импорт .kp) ────────────────────────────────────────────
   const cData = el('<div class="card"></div>');

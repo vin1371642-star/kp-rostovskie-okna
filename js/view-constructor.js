@@ -312,18 +312,29 @@ function renderBuyerFields(ctx, host){
         <input class="input" data-buyer="name" value="${escapeHtml(buyer.name || '')}">
       </div>
       <div class="row">
-        <div class="col field">
-          <label>ИНН</label>
-          <input class="input" data-buyer="inn" value="${escapeHtml(buyer.inn || '')}">
-        </div>
-        <div class="col field">
-          <label>КПП</label>
-          <input class="input" data-buyer="kpp" value="${escapeHtml(buyer.kpp || '')}">
-        </div>
+        <div class="col field"><label>ИНН</label><input class="input" data-buyer="inn" value="${escapeHtml(buyer.inn || '')}"></div>
+        <div class="col field"><label>КПП</label><input class="input" data-buyer="kpp" value="${escapeHtml(buyer.kpp || '')}"></div>
+        <div class="col field"><label>ОГРН</label><input class="input" data-buyer="ogrn" value="${escapeHtml(buyer.ogrn || '')}"></div>
       </div>
       <div class="field">
         <label>Адрес</label>
         <input class="input" data-buyer="address" value="${escapeHtml(buyer.address || '')}">
+      </div>
+      <div class="row">
+        <div class="col field"><label>Телефон</label><input class="input" data-buyer="phone" value="${escapeHtml(buyer.phone || '')}"></div>
+        <div class="col field"><label>E-mail</label><input class="input" data-buyer="email" value="${escapeHtml(buyer.email || '')}"></div>
+      </div>
+      <div class="row">
+        <div class="col field"><label>Расчётный счёт</label><input class="input" data-buyer="rs" value="${escapeHtml(buyer.rs || '')}"></div>
+        <div class="col field"><label>Банк</label><input class="input" data-buyer="bank" value="${escapeHtml(buyer.bank || '')}"></div>
+      </div>
+      <div class="row">
+        <div class="col field"><label>БИК</label><input class="input" data-buyer="bik" value="${escapeHtml(buyer.bik || '')}"></div>
+        <div class="col field"><label>Корр. счёт</label><input class="input" data-buyer="ks" value="${escapeHtml(buyer.ks || '')}"></div>
+      </div>
+      <div class="row">
+        <div class="col field"><label>Должность руководителя</label><input class="input" data-buyer="director_title" value="${escapeHtml(buyer.director_title || '')}" placeholder="Генеральный директор"></div>
+        <div class="col field"><label>ФИО руководителя</label><input class="input" data-buyer="director_name" value="${escapeHtml(buyer.director_name || '')}" placeholder="Иванов Иван Иванович"></div>
       </div>`;
   } else {
     host.innerHTML = `

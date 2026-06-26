@@ -5,22 +5,28 @@ import { seedData } from './seed.js';
 import { renderKpList } from './view-kp-list.js';
 import { renderConstructor } from './view-constructor.js';
 import { renderCatalog } from './view-catalog.js';
+import { renderDiscount } from './view-discount.js';
 import { renderOrganizations } from './view-organizations.js';
 import { renderSettings } from './view-settings.js';
+import { renderHelp } from './view-help.js';
 
 const NAV = [
   ['kp-list', 'Мои КП'],
   ['constructor', 'Конструктор КП'],
   ['catalog', 'Каталог'],
+  ['discount', 'Расчёт скидки'],
   ['organizations', 'Админ'],
   ['settings', 'Настройки'],
+  ['help', 'Инструкция'],
 ];
 const RENDER = {
   'kp-list': renderKpList,
   'constructor': renderConstructor,
   'catalog': renderCatalog,
+  'discount': renderDiscount,
   'organizations': renderOrganizations,
   'settings': renderSettings,
+  'help': renderHelp,
 };
 
 function renderNav(){

@@ -32,6 +32,7 @@ export function defaultSettings(){
   return {
     id: 'app',
     default_markup: 30,
+    admin_password: '', // отдельный пароль админ-режима (НЕ раздаётся сотрудникам)
     manager: { name: '', phone: '', position: 'Менеджер отдела продаж' },
     about: {
       slogan: 'Мы существуем, чтобы делать жизнь людей более комфортной.',
@@ -49,6 +50,8 @@ export function defaultSettings(){
     service_bases: ['10% от изделий', 'фикс', 'за шт'],
     service_items: ['Монтаж конструкций', 'Демонтаж старых конструкций', 'Доставка', 'Подъём на этаж', 'Откосы (монтаж)', 'Вывоз мусора'],
     columns_config: null,
+    doc_labels: {},    // переопределения подписей (ярлыков) в документе КП
+    disc_formulas: {}, // переопределения формул вкладки «Расчёт скидки» (по умолчанию — стандартные)
     catalog_seeded: false
   };
 }

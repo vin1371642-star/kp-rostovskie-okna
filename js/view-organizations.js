@@ -19,6 +19,9 @@ const FIELDS = [
   { k: 'ks',      label: 'Корр. счёт',            ph: '30101810000000000000' },
   { k: 'phone',   label: 'Телефон',               ph: '+7 863 000-00-00' },
   { k: 'email',   label: 'E-mail',                ph: 'info@example.ru' },
+  // Руководитель (для подписи в счёте-оферте; для ООО должность выводится у подписи). Необязательно.
+  { k: 'director_title', label: 'Должность руководителя', ph: 'Генеральный директор' },
+  { k: 'director_name',  label: 'ФИО руководителя',       ph: 'Иванов Иван Иванович' },
 ];
 
 const STYLE_ID = 'org-view-style';
@@ -84,6 +87,7 @@ function renderCard(o){
         ${o.ks ? reqLine('К/с', o.ks) : ''}
         ${reqLine('Тел.', o.phone)}
         ${reqLine('Email', o.email)}
+        ${(o.director_name || o.director_title) ? reqLine('Рук-ль', [o.director_title, o.director_name].filter(Boolean).join(' ')) : ''}
       </div>
       ${imgsHtml}
       <div class="org-actions">
@@ -108,7 +112,7 @@ function openForm(o, onSaved){
   const isNew = !o;
   const data = Object.assign(
     { id: '', name: '', brand: 'Ростовские окна', inn: '', kpp: '', ogrn: '', address: '',
-      rs: '', bank: '', bik: '', ks: '', phone: '', email: '', vat_rate: 5,
+      rs: '', bank: '', bik: '', ks: '', phone: '', email: '', director_title: '', director_name: '', vat_rate: 5,
       stamp_img: '', signature_img: '', logo_color: '', logo_white: '' },
     o || {}
   );
@@ -294,6 +298,24 @@ function buildPublishCard(host){
   });
 }
 
+// Карточка «Пароль администратора» — отдельный пароль расширенного режима. НЕ раздаётся.
+function buildAdminPasswordCard(host){
+  const cur = state.settings || {};
+  host.innerHTML = `
+    <div class="card">
+      <div class="h2">Пароль администратора</div>
+      <p class="muted">Отдельный пароль для расширенного режима (полный расчёт и редактирование формул во вкладке «Расчёт скидки»). Отличается от пароля публикации и НЕ раздаётся сотрудникам.</p>
+      <div class="field" style="max-width:340px"><label>Пароль администратора</label><input class="input" id="adm-pwd" value="${escapeHtml(cur.admin_password || '')}" placeholder="придумайте пароль"></div>
+      <div class="toolbar"><button class="btn btn-red" id="adm-save">Сохранить пароль</button><span class="muted" id="adm-status"></span></div>
+    </div>`;
+  host.querySelector('#adm-save').addEventListener('click', async () => {
+    const pw = host.querySelector('#adm-pwd').value.trim();
+    const s = Object.assign({}, state.settings, { admin_password: pw }); s.id = 'app';
+    try { await saveSettings(s); host.querySelector('#adm-status').textContent = 'Сохранено'; toast('Пароль администратора сохранён'); }
+    catch (e){ console.error('[admin pwd]', e); toast('Ошибка сохранения'); }
+  });
+}
+
 // Карточка «Низ КП — оформление» (блок о компании + подвал). Раздаётся по ссылке.
 function buildBrandingCard(host){
   const s = JSON.parse(JSON.stringify(state.settings || {}));
@@ -371,6 +393,7 @@ export async function renderOrganizations(root){
       Реквизиты подставляются в КП по выбору продавца в конструкторе.
     </p>
     <div id="pub-card"></div>
+    <div id="admin-pwd-card"></div>
     <div class="h2" style="margin:18px 0 8px">Организации-продавцы</div>
     <div class="toolbar">
       <button class="btn btn-red" id="org-add">+ Организация</button>
@@ -380,6 +403,7 @@ export async function renderOrganizations(root){
   `;
 
   buildPublishCard(root.querySelector('#pub-card'));
+  buildAdminPasswordCard(root.querySelector('#admin-pwd-card'));
   buildBrandingCard(root.querySelector('#branding-card'));
   root.querySelector('#org-add').addEventListener('click', () => openForm(null, repaint));
 
