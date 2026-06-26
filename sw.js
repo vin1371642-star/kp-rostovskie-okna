@@ -2,7 +2,7 @@
 // Эталон (код + статика) кэшируется здесь; личные данные живут в IndexedDB и SW их не трогает.
 // Стратегии: навигация — network-first (свежий код, офлайн-фолбэк на index.html);
 // статика (js/css/шрифты/картинки) — cache-first; api/ и shared.json — только сеть (никогда не кэшируем).
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'kp-rostov-' + VERSION;
 
 // Оболочка приложения — кладём в кэш при установке (гарантированный офлайн-старт).
@@ -28,6 +28,8 @@ const SHELL = [
   'js/view-constructor.js',
   'js/view-configurator.js',
   'js/view-catalog.js',
+  'js/view-discount.js',
+  'js/view-help.js',
   'js/view-organizations.js',
   'js/view-settings.js',
   'assets/logo-color.png',
