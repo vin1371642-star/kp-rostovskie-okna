@@ -73,15 +73,16 @@ function renderView(){
 
 subscribe(() => { renderNav(); renderView(); });
 
-// Офлайн-кэш (service worker) отключён — приложение всегда грузится свежим из сети.
-// Снимаем любой ранее зарегистрированный SW, чтобы старый кэш не залипал.
-if ('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations()
-    .then(rs => rs.forEach(r => r.unregister()))
-    .catch(() => {});
+// Минимальный service worker — только для «Установить как приложение». Он НЕ кэширует
+// (всё из сети), поэтому залипнуть на старом коде не может.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('[sw]', e));
+  });
 }
+// Дочищаем старые кэши от прежних версий с офлайн-кэшем (новый SW кэшей не создаёт).
 if (window.caches && caches.keys){
-  caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {}); // чистим старые кэши приложения
+  caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => {});
 }
 
 (async () => {
