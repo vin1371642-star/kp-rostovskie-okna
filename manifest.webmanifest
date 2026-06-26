@@ -1,0 +1,16 @@
+{
+  "name": "Ростовские окна · Коммерческие предложения",
+  "short_name": "КП Ростовские окна",
+  "description": "Конструктор коммерческих предложений «Ростовские окна» — каталог, расчёт, печать PDF. Работает офлайн.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F6F5F4",
+  "theme_color": "#B50900",
+  "icons": [
+    { "src": "assets/logo-color.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/logo-color.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
