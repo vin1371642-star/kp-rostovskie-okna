@@ -68,7 +68,17 @@ async function addSharedBundle(bundle){
 // ── Шифрование паролем: PBKDF2 (SHA-256) → AES-GCM 256 ──────────────────────
 const _enc = new TextEncoder();
 const _dec = new TextDecoder();
-const _b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+// base64 кодируем ПО ЧАСТЯМ: spread (...array) на большом бандле (печати/подписи/фото)
+// переполняет стек — «Maximum call stack size exceeded» при публикации.
+const _b64 = buf => {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const CHUNK = 0x8000; // 32 КБ за раз
+  for (let i = 0; i < bytes.length; i += CHUNK){
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+};
 const _unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
 async function deriveKey(password, salt){
