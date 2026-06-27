@@ -219,7 +219,7 @@ export const DOC_STYLE = `
 // ---------------------------------------------------------------------------
 
 // Шапка таблицы. variant: 'premium' (крупнее) | 'legal' (компактнее).
-function tableHead(isService, showSketch, variant) {
+function tableHead(isService, showSketch, variant, isProduct) {
   const big = variant === 'premium';
   const pad = big ? '10px 8px' : '9px 7px';
   const padL = big ? '10px 10px' : '9px 9px';
@@ -237,7 +237,7 @@ function tableHead(isService, showSketch, variant) {
   const skHide = showSketch ? '' : 'display:none;';
   let cells = '';
   cells += th(`width:${wNo};`, 'center', e(L('colNum')));
-  cells += th('', 'left', e(isService ? L('colNameService') : L('colName')));
+  cells += th('', 'left', e(isProduct ? L('colName') : L('colNameService')));
   cells += th(`width:${wSk};${skHide}`, 'center', e(L('colSketch')));
   cells += th(`width:${wMid};`, 'center', e(isService ? L('colBasis') : L('colSize')));
   cells += th(`width:${wQty};`, 'center', e(L('colQty')));
@@ -319,13 +319,13 @@ function sectionTitle(text, variant) {
 }
 
 // Полная таблица раздела (заголовок + thead + строки + итог).
-function sectionTable(title, rows, totalLabel, total, isService, showSketch, variant) {
+function sectionTable(title, rows, totalLabel, total, isService, showSketch, variant, isProduct) {
   if (!rows.length) return '';
   let body = '';
   rows.forEach((it, i) => { body += tableRow(it, i + 1, isService, showSketch, variant); });
   body += sectionTotalRow(totalLabel, total, showSketch, variant);
   return sectionTitle(title, variant)
-    + `<table style="width:100%;border-collapse:collapse;">${tableHead(isService, showSketch, variant)}<tbody>${body}</tbody></table>`;
+    + `<table style="width:100%;border-collapse:collapse;">${tableHead(isService, showSketch, variant, isProduct)}<tbody>${body}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,9 +526,9 @@ function renderPremium(kp, items, settings, org) {
 
   // Таблицы.
   html += `<div style="padding:0 16mm;">`;
-  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium');
-  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'premium');
-  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'premium');
+  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium', true);
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'premium', false);
+  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, false, 'premium', false);
   html += `</div>`;
 
   // Итоги.
@@ -681,11 +681,11 @@ function renderLegal(kp, items, settings, org) {
 
   // Таблицы.
   html += `<div style="padding:18px 16mm 0;">`;
-  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal');
+  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal', true);
   html += `<div style="height:0;"></div>`;
-  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'legal');
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'legal', false);
   html += `<div style="height:0;"></div>`;
-  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'legal');
+  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, false, 'legal', false);
   html += `</div>`;
 
   // Итоги (с НДС).

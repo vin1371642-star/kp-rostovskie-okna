@@ -28,6 +28,11 @@ function ensureStyle(){
   .ctr-iconbtn{border:none;background:none;cursor:pointer;color:var(--muted2);padding:4px 6px;border-radius:5px;font-size:13px;line-height:1}
   .ctr-iconbtn:hover{background:var(--surface);color:var(--ink)}
   .ctr-iconbtn.del:hover{color:var(--red)}
+  .ctr-sketch-cell{display:flex;align-items:center;justify-content:center;width:100%;min-height:42px;padding:3px;border:1px dashed #d8d6d2;border-radius:6px;background:#fff;cursor:pointer}
+  .ctr-sketch-cell:hover{border-color:var(--red);background:#fffaf9}
+  .ctr-sketch-cell.has-img{border-style:solid;border-color:var(--line);padding:2px}
+  .ctr-sketch-cell img{max-width:64px;max-height:40px;object-fit:contain;display:block}
+  .ctr-sketch-add{font-size:11.5px;color:var(--muted);white-space:nowrap}
   .ctr-tot-grid{display:flex;flex-direction:column;gap:6px;align-items:flex-end;font-size:13px}
   .ctr-tot-grid .row-t{display:flex;gap:24px;justify-content:space-between;min-width:280px}
   .ctr-tot-grid .row-t b{font-family:var(--head)}
@@ -337,12 +342,12 @@ function buildHeaderCard(ctx){
     });
   });
 
-  // Сегмент эскизов.
+  // Сегмент эскизов: переключает показ колонки «Эскиз» в продукции (и в печатном КП).
   card.querySelectorAll('[data-sketch-seg] button').forEach(b => {
     b.addEventListener('click', () => {
       kp.show_sketches = b.dataset.sk === 'on';
-      card.querySelectorAll('[data-sketch-seg] button').forEach(x => x.classList.toggle('on', x.dataset.sk === b.dataset.sk));
       persist(ctx, true);
+      paint(ctx); // перерисовать разделы, чтобы колонка «Эскиз» появилась/скрылась сразу
     });
   });
 
@@ -456,6 +461,9 @@ const SECTION_CFG = {
 function buildSection(ctx, section){
   const cfg = SECTION_CFG[section] || SECTION_CFG.product;
   const isService = section === 'service'; // услуги — без скидки и со «Основанием»
+  const isProduct = section === 'product'; // только у продукции есть эскизы
+  // Колонка «Эскиз» показывается лишь у продукции и при включённом тумблере эскизов.
+  const sketchCol = isProduct && ctx.kp.show_sketches !== false;
   const wrap = el(`<div class="card ctr-sec"></div>`);
 
   const head = el(`
@@ -474,11 +482,12 @@ function buildSection(ctx, section){
     <table class="table">
       <thead>
         <tr>
-          <th style="width:34%">Наименование</th>
-          <th style="width:14%">${isService ? 'Основание' : 'Размер'}</th>
+          <th style="width:${sketchCol ? 27 : 34}%">Наименование</th>
+          ${sketchCol ? '<th style="width:9%">Эскиз</th>' : ''}
+          <th style="width:13%">${isService ? 'Основание' : 'Размер'}</th>
           <th style="width:8%" class="right">Кол-во</th>
           <th style="width:9%">Ед.</th>
-          <th style="width:13%" class="right">Цена</th>
+          <th style="width:12%" class="right">Цена</th>
           <th style="width:14%" class="right">Сумма</th>
           <th style="width:8%" class="right ctr-noprint">—</th>
         </tr>
@@ -489,7 +498,7 @@ function buildSection(ctx, section){
   const rows = sectionItems(ctx, section);
 
   if (!rows.length){
-    tbody.appendChild(el(`<tr class="ctr-empty-row"><td colspan="7">${cfg.empty}</td></tr>`));
+    tbody.appendChild(el(`<tr class="ctr-empty-row"><td colspan="${sketchCol ? 8 : 7}">${cfg.empty}</td></tr>`));
   } else {
     rows.forEach(it => tbody.appendChild(buildRow(ctx, it, section)));
   }
@@ -505,6 +514,7 @@ function buildRow(ctx, it, section){
   const isService = section === 'service';
   const isProduct = section === 'product';
   const isGoods = !isService; // продукция и доп. материалы — товары (со скидкой)
+  const sketchCol = isProduct && ctx.kp.show_sketches !== false; // эскизы — только у продукции и при включённом тумблере
   const tr = el('<tr></tr>');
 
   // Наименование.
@@ -523,6 +533,22 @@ function buildRow(ctx, it, section){
     tdName.appendChild(d);
   }
   tr.appendChild(tdName);
+
+  // Эскиз (только продукция, при включённом тумблере): миниатюра либо плашка «+ эскиз», клик — модалка вставки.
+  if (sketchCol){
+    const tdSketch = el('<td></td>');
+    const skBtn = el(`<button class="ctr-sketch-cell" type="button" title="Эскиз — вставить Ctrl+V"></button>`);
+    const renderSk = () => {
+      skBtn.classList.toggle('has-img', !!it.sketch_img);
+      skBtn.innerHTML = it.sketch_img
+        ? `<img src="${it.sketch_img}" alt="эскиз">`
+        : `<span class="ctr-sketch-add">+ эскиз</span>`;
+    };
+    renderSk();
+    skBtn.addEventListener('click', () => openSketchModal(ctx, it));
+    tdSketch.appendChild(skBtn);
+    tr.appendChild(tdSketch);
+  }
 
   // Размер (товары) или Основание (услуга).
   const tdSecond = el('<td></td>');
@@ -579,10 +605,6 @@ function buildRow(ctx, it, section){
   down.addEventListener('click', () => moveItem(ctx, it, +1));
   tdAct.appendChild(down);
   if (isProduct){
-    const sk = el('<button class="ctr-iconbtn" title="Эскиз — вставить Ctrl+V">🖼</button>');
-    if (it.sketch_img) sk.style.color = 'var(--red)';
-    sk.addEventListener('click', () => openSketchModal(ctx, it));
-    tdAct.appendChild(sk);
     const edit = el('<button class="ctr-iconbtn" title="Редактировать">✎</button>');
     edit.addEventListener('click', () => editProduct(ctx, it));
     tdAct.appendChild(edit);
