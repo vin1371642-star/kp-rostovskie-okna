@@ -26,7 +26,7 @@ function val(v, fallback) {
 
 // Настраиваемые подписи (ярлыки) документа. Переопределяются в Настройках (settings.doc_labels).
 const DOC_LABELS = {
-  secProducts: 'Продукция', secServices: 'Услуги',
+  secProducts: 'Продукция', secMaterials: 'Дополнительные материалы', secServices: 'Услуги',
   addr: 'Адрес объекта', valid: 'Действительно до',
   seller: 'Продавец', buyer: 'Покупатель',
   termProduce: 'Срок изготовления', termWarranty: 'Гарантия', termPayment: 'Условия оплаты',
@@ -39,7 +39,7 @@ let _labels = DOC_LABELS;
 function L(key){ const v = _labels[key]; return (v != null && String(v).trim()) ? v : (DOC_LABELS[key] || ''); }
 // Список ярлыков для редактора в Настройках: ключ + человекочитаемое описание.
 export const DOC_LABEL_FIELDS = [
-  ['secProducts', 'Раздел «Продукция»'], ['secServices', 'Раздел «Услуги»'],
+  ['secProducts', 'Раздел «Продукция»'], ['secMaterials', 'Раздел «Доп. материалы»'], ['secServices', 'Раздел «Услуги»'],
   ['addr', 'Адрес объекта'], ['valid', 'Действительно до'],
   ['seller', 'Сторона «Продавец»'], ['buyer', 'Сторона «Покупатель»'],
   ['termProduce', 'Условия: срок изготовления'], ['termWarranty', 'Условия: гарантия'], ['termPayment', 'Условия: оплата'],
@@ -435,7 +435,8 @@ function renderPremium(kp, items, settings, org) {
   const about = (settings && settings.about) || {};
   const showSketch = kp.show_sketches !== false;
   const totals = computeKpTotals(kp, items);
-  const products = items.filter(it => it.section !== 'service');
+  const products = items.filter(it => it.section === 'product');
+  const materials = items.filter(it => it.section === 'material');
   const services = items.filter(it => it.section === 'service');
 
   const logoWhite = val(o.logo_white) || 'assets/logo-white.png';
@@ -526,6 +527,7 @@ function renderPremium(kp, items, settings, org) {
   // Таблицы.
   html += `<div style="padding:0 16mm;">`;
   html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium');
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, showSketch, 'premium');
   html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'premium');
   html += `</div>`;
 
@@ -596,7 +598,8 @@ function renderLegal(kp, items, settings, org) {
   const o = org || {};
   const showSketch = kp.show_sketches !== false;
   const totals = computeKpTotals(kp, items);
-  const products = items.filter(it => it.section !== 'service');
+  const products = items.filter(it => it.section === 'product');
+  const materials = items.filter(it => it.section === 'material');
   const services = items.filter(it => it.section === 'service');
 
   const logoColor = val(o.logo_color) || 'assets/logo-color.png';
@@ -668,6 +671,8 @@ function renderLegal(kp, items, settings, org) {
   // Таблицы.
   html += `<div style="padding:18px 16mm 0;">`;
   html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal');
+  html += `<div style="height:0;"></div>`;
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, showSketch, 'legal');
   html += `<div style="height:0;"></div>`;
   html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'legal');
   html += `</div>`;

@@ -129,6 +129,7 @@ function paint(ctx){
   root.innerHTML = '';
   root.appendChild(buildHeaderCard(ctx));
   root.appendChild(buildSection(ctx, 'product'));
+  root.appendChild(buildSection(ctx, 'material'));
   root.appendChild(buildSection(ctx, 'service'));
   root.appendChild(buildTermsCard(ctx));
   root.appendChild(buildTotals(ctx));
@@ -365,19 +366,27 @@ function sectionItems(ctx, section){
   return ctx.items.filter(it => it.section === section);
 }
 
+// Конфигурация трёх разделов: продукция → доп. материалы → услуги.
+const SECTION_CFG = {
+  product:  { title: 'Продукция',                 add: '+ Добавить изделие',  empty: 'Пока нет изделий. Нажмите «Добавить изделие».' },
+  material: { title: 'Дополнительные материалы',  add: '+ Добавить материал', empty: 'Пока нет материалов. Нажмите «Добавить материал».' },
+  service:  { title: 'Услуги',                    add: '+ Добавить услугу',   empty: 'Пока нет услуг. Нажмите «Добавить услугу».' },
+};
+
 function buildSection(ctx, section){
-  const isProduct = section === 'product';
+  const cfg = SECTION_CFG[section] || SECTION_CFG.product;
+  const isService = section === 'service'; // услуги — без скидки и со «Основанием»
   const wrap = el(`<div class="card ctr-sec"></div>`);
-  const title = isProduct ? 'Продукция' : 'Услуги';
-  const addLabel = isProduct ? '+ Добавить изделие' : '+ Добавить услугу';
 
   const head = el(`
     <div class="ctr-sec-head">
-      <div class="h2" style="margin:0">${title}</div>
-      <button class="btn btn-ghost btn-sm ctr-noprint" type="button">${addLabel}</button>
+      <div class="h2" style="margin:0">${cfg.title}</div>
+      <button class="btn btn-ghost btn-sm ctr-noprint" type="button">${cfg.add}</button>
     </div>`);
   head.querySelector('button').addEventListener('click', () => {
-    isProduct ? addProduct(ctx) : addService(ctx);
+    if (section === 'product') addProduct(ctx);
+    else if (section === 'material') addMaterial(ctx);
+    else addService(ctx);
   });
   wrap.appendChild(head);
 
@@ -386,9 +395,7 @@ function buildSection(ctx, section){
       <thead>
         <tr>
           <th style="width:34%">Наименование</th>
-          ${isProduct
-            ? '<th style="width:14%">Размер</th>'
-            : '<th style="width:14%">Основание</th>'}
+          <th style="width:14%">${isService ? 'Основание' : 'Размер'}</th>
           <th style="width:8%" class="right">Кол-во</th>
           <th style="width:9%">Ед.</th>
           <th style="width:13%" class="right">Цена</th>
@@ -402,25 +409,28 @@ function buildSection(ctx, section){
   const rows = sectionItems(ctx, section);
 
   if (!rows.length){
-    tbody.appendChild(el(`<tr class="ctr-empty-row"><td colspan="7">${isProduct ? 'Пока нет изделий. Нажмите «Добавить изделие».' : 'Пока нет услуг. Нажмите «Добавить услугу».'}</td></tr>`));
+    tbody.appendChild(el(`<tr class="ctr-empty-row"><td colspan="7">${cfg.empty}</td></tr>`));
   } else {
-    rows.forEach(it => tbody.appendChild(buildRow(ctx, it, isProduct)));
+    rows.forEach(it => tbody.appendChild(buildRow(ctx, it, section)));
   }
   wrap.appendChild(table);
 
   const subtotal = rows.reduce((s, it) => s + n(it.amount), 0);
-  wrap.appendChild(el(`<div class="ctr-sub">Подытог «${title}»: <b>${money(subtotal)}</b></div>`));
+  wrap.appendChild(el(`<div class="ctr-sub">Подытог «${cfg.title}»: <b>${money(subtotal)}</b></div>`));
 
   return wrap;
 }
 
-function buildRow(ctx, it, isProduct){
+function buildRow(ctx, it, section){
+  const isService = section === 'service';
+  const isProduct = section === 'product';
+  const isGoods = !isService; // продукция и доп. материалы — товары (со скидкой)
   const tr = el('<tr></tr>');
 
   // Наименование.
   const tdName = el('<td></td>');
-  if (isProduct){
-    tdName.appendChild(makeCellInput(it.name || '', v => { it.name = v; recalcRow(it); }, ctx, 'text', 'Наименование изделия'));
+  if (isGoods){
+    tdName.appendChild(makeCellInput(it.name || '', v => { it.name = v; recalcRow(it); }, ctx, 'text', isProduct ? 'Наименование изделия' : 'Наименование материала'));
   } else {
     tdName.appendChild(makeServiceNameSelect(ctx, it));
   }
@@ -432,9 +442,9 @@ function buildRow(ctx, it, isProduct){
   }
   tr.appendChild(tdName);
 
-  // Размер (продукт) или Основание (услуга).
+  // Размер (товары) или Основание (услуга).
   const tdSecond = el('<td></td>');
-  if (isProduct){
+  if (isGoods){
     tdSecond.appendChild(makeCellInput(it.size_wh || '', v => { it.size_wh = v; }, ctx, 'text', 'напр. 1300×1400'));
   } else {
     const sel = el(`<select class="ctr-cell-input">
@@ -456,7 +466,7 @@ function buildRow(ctx, it, isProduct){
   const unitSel = el(`<select class="ctr-cell-input">
     ${UNITS.map(u => `<option value="${escapeHtml(u)}"${it.unit === u ? ' selected' : ''}>${escapeHtml(u)}</option>`).join('')}
   </select>`);
-  if (!it.unit) it.unit = isProduct ? 'шт' : 'усл.';
+  if (!it.unit) it.unit = isService ? 'усл.' : 'шт';
   unitSel.value = it.unit;
   unitSel.addEventListener('change', () => { it.unit = unitSel.value; persist(ctx, true); });
   tdUnit.appendChild(unitSel);
@@ -529,13 +539,14 @@ function recalcRow(it){
 
 // Обновить подытоги разделов и итоговую панель без сброса фокуса в шапке.
 function rerenderTotalsAndSub(ctx){
-  // Подытоги — простая замена текста в обоих разделах.
-  const cards = ctx.root.querySelectorAll('.ctr-sec');
+  // Подытоги трёх разделов (порядок: продукция, доп. материалы, услуги).
   const prodSub = sectionItems(ctx, 'product').reduce((s, it) => s + n(it.amount), 0);
+  const matSub  = sectionItems(ctx, 'material').reduce((s, it) => s + n(it.amount), 0);
   const servSub = sectionItems(ctx, 'service').reduce((s, it) => s + n(it.amount), 0);
   const subs = ctx.root.querySelectorAll('.ctr-sub b');
   if (subs[0]) subs[0].textContent = money(prodSub);
-  if (subs[1]) subs[1].textContent = money(servSub);
+  if (subs[1]) subs[1].textContent = money(matSub);
+  if (subs[2]) subs[2].textContent = money(servSub);
   refreshTotals(ctx);
 }
 
@@ -609,6 +620,27 @@ function addService(ctx){
     size_wh: '',
     qty: 1,
     unit: 'усл.',
+    basis: '',
+    markup_pct: null,
+    purchase_sum: 0,
+    price: 0,
+    amount: 0
+  };
+  ctx.items.push(it);
+  persist(ctx, true);
+  paint(ctx);
+}
+
+// Доп. материал — товарная строка (входит в скидку), заполняется вручную: наименование, размер, кол-во, цена.
+function addMaterial(ctx){
+  const it = {
+    section: 'material',
+    name: '',
+    descr: '',
+    components: [],
+    size_wh: '',
+    qty: 1,
+    unit: 'шт',
     basis: '',
     markup_pct: null,
     purchase_sum: 0,
@@ -716,7 +748,7 @@ function buildTotals(ctx){
   card.innerHTML = `
     <div class="row" style="align-items:flex-end">
       <div class="col field ctr-discount">
-        <label>Скидка на изделия, ₽</label>
+        <label>Скидка на изделия и материалы, ₽</label>
         <input class="input" type="number" min="0" step="1" data-discount value="${n(ctx.kp.discount)}">
       </div>
       <div class="col"></div>

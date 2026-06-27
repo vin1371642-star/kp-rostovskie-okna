@@ -51,24 +51,29 @@ export function computeKpTotals(kp, items) {
   const list = Array.isArray(items) ? items : [];
 
   let productSubtotal = 0;
+  let materialSubtotal = 0;
   let serviceSubtotal = 0;
   for (const it of list) {
     if (it == null) continue;
     const amount = n(it.amount);
     if (it.section === 'service') {
       serviceSubtotal += amount;
+    } else if (it.section === 'material') {
+      materialSubtotal += amount;
     } else if (it.section === 'product') {
       productSubtotal += amount;
     }
   }
   productSubtotal = Math.round(productSubtotal);
+  materialSubtotal = Math.round(materialSubtotal);
   serviceSubtotal = Math.round(serviceSubtotal);
 
-  const subtotal = productSubtotal + serviceSubtotal;
-  // Скидка применяется ТОЛЬКО к продукции (изделиям); на услуги не распространяется
-  // и не может превышать сумму продукции.
-  const discount = Math.min(Math.round(n(k.discount)), productSubtotal);
-  const base = Math.max(0, productSubtotal - discount) + serviceSubtotal;
+  const subtotal = productSubtotal + materialSubtotal + serviceSubtotal;
+  // Скидка применяется к продукции И доп. материалам (на услуги НЕ распространяется)
+  // и не может превышать их суммарную стоимость.
+  const goodsSubtotal = productSubtotal + materialSubtotal;
+  const discount = Math.min(Math.round(n(k.discount)), goodsSubtotal);
+  const base = Math.max(0, goodsSubtotal - discount) + serviceSubtotal;
 
   // НДС можно полностью скрыть в конкретном КП (k.vat_show === false) — напр. для физлиц
   // при наличной оплате: НДС не считается и не отображается, итог = сумма КП.
@@ -81,6 +86,7 @@ export function computeKpTotals(kp, items) {
 
   return {
     productSubtotal,
+    materialSubtotal,
     serviceSubtotal,
     subtotal,
     discount,
