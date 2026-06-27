@@ -527,7 +527,7 @@ function renderPremium(kp, items, settings, org) {
   // Таблицы.
   html += `<div style="padding:0 16mm;">`;
   html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium');
-  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, showSketch, 'premium');
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'premium');
   html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'premium');
   html += `</div>`;
 
@@ -683,7 +683,7 @@ function renderLegal(kp, items, settings, org) {
   html += `<div style="padding:18px 16mm 0;">`;
   html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal');
   html += `<div style="height:0;"></div>`;
-  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, showSketch, 'legal');
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'legal');
   html += `<div style="height:0;"></div>`;
   html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, showSketch, 'legal');
   html += `</div>`;
