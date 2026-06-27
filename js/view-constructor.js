@@ -35,6 +35,12 @@ function ensureStyle(){
   .ctr-seg button{border:none;background:#fff;color:var(--ink);font:500 12.5px/1 var(--sans);padding:8px 12px;cursor:pointer}
   .ctr-seg button.on{background:var(--ink);color:#fff}
   .ctr-discount{max-width:160px}
+  .ctr-photos{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+  .ctr-photo{position:relative;width:120px;height:84px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .ctr-photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .ctr-photo-x{position:absolute;top:3px;right:3px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .ctr-photo-add{width:120px;height:84px;border:2px dashed #d8c6c4;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted2);font-size:12px;cursor:pointer;background:#fcfbfa}
+  .ctr-photo-add span{font-size:10px}
   @media print{ .ctr-noprint{display:none} }
   `;
   document.head.appendChild(s);
@@ -73,6 +79,43 @@ function makeServiceNameSelect(ctx, it){
           const s = Object.assign({}, state.settings, { service_items: [...cur, name] });
           s.id = 'app';
           try { await saveSettings(s); } catch (e){ console.error('[service add]', e); }
+        }
+        it.name = name;
+      }
+      paint(ctx);
+      return;
+    }
+    it.name = sel.value;
+    persist(ctx, true);
+  });
+  return sel;
+}
+
+// Список доп. материалов — редактируется в Каталоге, хранится в настройках.
+function materialList(){
+  const x = state.settings && state.settings.material_items;
+  return (Array.isArray(x) && x.length) ? x : ['Подоконник', 'Отлив', 'Москитная сетка', 'Откосы', 'Отделочный уголок'];
+}
+// Выпадающий список наименования материала (выбор из каталога + добавить новый).
+function makeMaterialNameSelect(ctx, it){
+  const list = materialList();
+  const extra = (it.name && !list.includes(it.name))
+    ? `<option value="${escapeHtml(it.name)}" selected>${escapeHtml(it.name)}</option>` : '';
+  const sel = el(`<select class="ctr-cell-input">
+    <option value="">— выберите материал —</option>
+    ${list.map(name => `<option value="${escapeHtml(name)}"${it.name === name ? ' selected' : ''}>${escapeHtml(name)}</option>`).join('')}
+    ${extra}
+    <option value="__new__">+ добавить новый…</option>
+  </select>`);
+  sel.addEventListener('change', async () => {
+    if (sel.value === '__new__'){
+      const name = (prompt('Название нового материала:') || '').trim();
+      if (name){
+        const cur = materialList();
+        if (!cur.includes(name)){
+          const s = Object.assign({}, state.settings, { material_items: [...cur, name] });
+          s.id = 'app';
+          try { await saveSettings(s); } catch (e){ console.error('[material add]', e); }
         }
         it.name = name;
       }
@@ -201,6 +244,8 @@ function buildHeaderCard(ctx){
       <input class="input" data-f="object_address" value="${escapeHtml(kp.object_address || '')}" placeholder="Город, улица, дом">
     </div>
 
+    <div data-object-photos></div>
+
     <div class="row">
       <div class="col field">
         <label>Менеджер — имя</label>
@@ -243,6 +288,7 @@ function buildHeaderCard(ctx){
   `;
 
   renderBuyerFields(ctx, card.querySelector('[data-buyer-fields]'));
+  buildObjectPhotos(ctx, card.querySelector('[data-object-photos]'));
 
   // Простые текстовые/select поля kp.*
   card.querySelectorAll('[data-f]').forEach(inp => {
@@ -360,6 +406,40 @@ function renderBuyerFields(ctx, host){
   });
 }
 
+// Фото объекта (для презентации в КП юрлицам): несколько изображений, вставка Ctrl+V / файл / drag-drop.
+function buildObjectPhotos(ctx, host){
+  if (!host) return;
+  const kp = ctx.kp;
+  kp.object_photos = Array.isArray(kp.object_photos) ? kp.object_photos : [];
+  host.innerHTML = '';
+  const wrap = el('<div class="field"></div>');
+  wrap.appendChild(el('<label>Фото объекта (для презентации в КП — вставьте Ctrl+V из проекта или выберите файлы)</label>'));
+  const grid = el('<div class="ctr-photos"></div>');
+  const add = d => { kp.object_photos.push(d); renderGrid(); persist(ctx, true); };
+  function renderGrid(){
+    grid.innerHTML = '';
+    kp.object_photos.forEach((src, i) => {
+      const cell = el(`<div class="ctr-photo"><img src="${src}" alt=""><button class="ctr-photo-x" type="button" title="Убрать">✕</button></div>`);
+      cell.querySelector('.ctr-photo-x').addEventListener('click', () => { kp.object_photos.splice(i, 1); renderGrid(); persist(ctx, true); });
+      grid.appendChild(cell);
+    });
+    const drop = el('<div class="ctr-photo-add" tabindex="0" title="Кликните и нажмите Ctrl+V, либо перетащите файл">+ фото<br><span>Ctrl+V / файл</span></div>');
+    drop.addEventListener('click', () => drop.focus());
+    drop.addEventListener('dragover', e => e.preventDefault());
+    drop.addEventListener('drop', e => { e.preventDefault(); [...(e.dataTransfer.files || [])].filter(f => f.type.indexOf('image') === 0).forEach(f => readFileAsDataURL(f).then(add)); });
+    drop.addEventListener('paste', e => {
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const it of items){ if (it.type && it.type.indexOf('image') === 0){ const f = it.getAsFile(); if (f){ readFileAsDataURL(f).then(add); e.preventDefault(); } return; } }
+    });
+    grid.appendChild(drop);
+  }
+  renderGrid();
+  const file = el('<input type="file" accept="image/*" multiple style="margin-top:8px">');
+  file.addEventListener('change', () => { [...file.files].forEach(f => readFileAsDataURL(f).then(add)); file.value = ''; });
+  wrap.appendChild(grid); wrap.appendChild(file);
+  host.appendChild(wrap);
+}
+
 /* ───────────────────────── Разделы позиций ───────────────────────── */
 
 function sectionItems(ctx, section){
@@ -429,8 +509,10 @@ function buildRow(ctx, it, section){
 
   // Наименование.
   const tdName = el('<td></td>');
-  if (isGoods){
-    tdName.appendChild(makeCellInput(it.name || '', v => { it.name = v; recalcRow(it); }, ctx, 'text', isProduct ? 'Наименование изделия' : 'Наименование материала'));
+  if (isProduct){
+    tdName.appendChild(makeCellInput(it.name || '', v => { it.name = v; recalcRow(it); }, ctx, 'text', 'Наименование изделия'));
+  } else if (section === 'material'){
+    tdName.appendChild(makeMaterialNameSelect(ctx, it));
   } else {
     tdName.appendChild(makeServiceNameSelect(ctx, it));
   }

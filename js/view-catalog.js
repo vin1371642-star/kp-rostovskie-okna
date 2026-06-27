@@ -63,6 +63,8 @@ export async function renderCatalog(root){
 
   // ── Шаблоны изделий (аккордеон) ──
   wrap.appendChild(accCard(root, 'kits', 'Шаблоны изделий', () => kitsBody(root, kits)));
+  // ── Дополнительные материалы (аккордеон) ──
+  wrap.appendChild(accCard(root, 'materials', 'Дополнительные материалы', () => listEditorBody('material_items', ['Подоконник', 'Отлив', 'Москитная сетка', 'Откосы'], 'Материалы для выбора в КП (в разделе «Дополнительные материалы»). Один пункт на строку.')));
   // ── Услуги (аккордеон) ──
   wrap.appendChild(accCard(root, 'services', 'Услуги', () => listEditorBody('service_items', ['Монтаж', 'Доставка', 'Демонтаж'], 'Услуги для выбора в КП (в разделе «Услуги»). Один пункт на строку.')));
   // ── Основания услуг (аккордеон) ──

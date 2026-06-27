@@ -668,6 +668,17 @@ function renderLegal(kp, items, settings, org) {
     </div>
   </div>`;
 
+  // Фото объекта (презентация) — под адресом, если загружены.
+  const photos = Array.isArray(kp.object_photos) ? kp.object_photos.filter(Boolean) : [];
+  if (photos.length){
+    html += `<div style="padding:14px 16mm 0;">
+      <div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:8px;">Фото объекта</div>
+      <div data-keep style="display:grid;grid-template-columns:repeat(${photos.length === 1 ? 1 : 2},1fr);gap:10px;">
+        ${photos.map(src => `<img src="${e(src)}" alt="" style="width:100%;height:auto;max-height:240px;object-fit:cover;border:1px solid #EDEDED;border-radius:6px;display:block;break-inside:avoid;">`).join('')}
+      </div>
+    </div>`;
+  }
+
   // Таблицы.
   html += `<div style="padding:18px 16mm 0;">`;
   html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal');
