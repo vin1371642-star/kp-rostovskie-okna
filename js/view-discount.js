@@ -126,7 +126,7 @@ export function renderDiscount(root){
     input.addEventListener('input', () => { inp[key] = n(input.value); paint(); });
     return f;
   };
-  cIn.appendChild(mkNum('База за изделия (закупка), ₽', 'base', 'Себестоимость изделий', 'base'));
+  cIn.appendChild(mkNum('База за изделия, ₽', 'base', 'Себестоимость изделий', 'base'));
   cIn.appendChild(mkNum('Изделия для клиента (с НДС), ₽', 'goods', '', 'goods'));
   cIn.appendChild(mkNum('Монтаж для клиента (с НДС), ₽', 'mount', '', 'mount'));
   cIn.appendChild(mkNum('Агент, %', 'agent', 'Вознаграждение агента', 'agentPct'));
