@@ -38,7 +38,7 @@ export function retail(purchase, markupPct) {
 
 /**
  * Итоги по КП.
- * Ставка НДС берётся из kp.vat_rate (0/5/7/22) и начисляется СВЕРХУ отдельной строкой.
+ * Ставка НДС берётся из kp.vat_rate (0/5/22) и начисляется СВЕРХУ отдельной строкой.
  * kp.vat_show === false полностью убирает НДС из расчёта и из документа.
  * @param {{vat_rate?:number, vat_show?:boolean, discount?:number}} kp
  * @param {Array<{section?:string, amount?:number}>} items

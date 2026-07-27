@@ -4,7 +4,9 @@ import { toast, modal, escapeHtml, readFileAsDataURL, el, watchPasteImage } from
 import { state, saveSettings } from './store.js';
 import { publishShared, pullShared } from './publish.js';
 
-const VAT_RATES = [0, 5, 7, 22];
+// Ставки НДС 2026, которые компания реально применяет: 0 (без НДС), 5 % и 22 %.
+// Ставку 7 % убрали по решению заказчика (27.07.2026) — она не используется.
+const VAT_RATES = [0, 5, 22];
 
 // Поля формы: ключ схемы → подпись. brand зашит '=Ростовские окна'.
 const FIELDS = [
@@ -127,8 +129,13 @@ function openForm(o, onSaved){
   }
   flush();
 
-  const vatOptions = VAT_RATES.map(r =>
-    `<option value="${r}"${Number(data.vat_rate) === r ? ' selected' : ''}>${r}%</option>`).join('');
+  // Если у организации сохранена ставка, которой в списке больше нет (например, 7 %),
+  // добавляем её отдельным пунктом: иначе селект молча выбрал бы первую (0 %)
+  // и сохранение изменило бы ставку без ведома пользователя.
+  const savedRate = Number(data.vat_rate) || 0;
+  const rates = VAT_RATES.includes(savedRate) ? VAT_RATES : [...VAT_RATES, savedRate].sort((a, b) => a - b);
+  const vatOptions = rates.map(r =>
+    `<option value="${r}"${savedRate === r ? ' selected' : ''}>${r}%${VAT_RATES.includes(r) ? '' : ' (не используется)'}</option>`).join('');
 
   const imgPicker = (key, label) => `
     <div class="field col">
