@@ -24,6 +24,20 @@ function val(v, fallback) {
   return s || (fallback == null ? '' : fallback);
 }
 
+// Значения-заглушки из стартового каталога (seed.js пишет 'TODO' в реквизиты, пока
+// заказчик их не заполнил). В документ клиенту такое попадать не должно: в оферте
+// строка «ИНН: TODO» — это основание не принять документ к оплате. Считаем их пустыми,
+// строка просто не печатается.
+const PLACEHOLDER_RE = /^(todo|tbd|xxx+|-{1,}|—|н\/д|нет данных)$/i;
+function isPlaceholder(v) {
+  return PLACEHOLDER_RE.test(String(v == null ? '' : v).trim());
+}
+// Значение реквизита: пустое, если не заполнено или осталось заглушкой.
+function req(v) {
+  const s = val(v);
+  return isPlaceholder(s) ? '' : s;
+}
+
 // Настраиваемые подписи (ярлыки) документа. Переопределяются в Настройках (settings.doc_labels).
 const DOC_LABELS = {
   secProducts: 'Продукция', secMaterials: 'Дополнительные материалы', secServices: 'Услуги',
@@ -109,14 +123,14 @@ function orgContactLines(org) {
   const o = org || {};
   const lines = [];
   const idParts = [];
-  if (val(o.inn)) idParts.push('ИНН ' + e(o.inn));
-  if (val(o.kpp)) idParts.push('КПП ' + e(o.kpp));
-  if (val(o.ogrn)) idParts.push('ОГРН ' + e(o.ogrn));
+  if (req(o.inn)) idParts.push('ИНН ' + e(req(o.inn)));
+  if (req(o.kpp)) idParts.push('КПП ' + e(req(o.kpp)));
+  if (req(o.ogrn)) idParts.push('ОГРН ' + e(req(o.ogrn)));
   if (idParts.length) lines.push(idParts.join(' · '));
-  if (val(o.address)) lines.push(e(o.address));
+  if (req(o.address)) lines.push(e(req(o.address)));
   const contact = [];
-  if (val(o.phone)) contact.push(e(o.phone));
-  if (val(o.email)) contact.push(e(o.email));
+  if (req(o.phone)) contact.push(e(req(o.phone)));
+  if (req(o.email)) contact.push(e(req(o.email)));
   if (contact.length) lines.push(contact.join(' · '));
   return lines;
 }
@@ -126,20 +140,20 @@ function orgFullRequisites(o) {
   const x = o || {};
   const lines = [];
   const innKpp = [];
-  if (val(x.inn)) innKpp.push('ИНН: ' + e(x.inn));
-  if (val(x.kpp)) innKpp.push('КПП: ' + e(x.kpp));
+  if (req(x.inn)) innKpp.push('ИНН: ' + e(req(x.inn)));
+  if (req(x.kpp)) innKpp.push('КПП: ' + e(req(x.kpp)));
   if (innKpp.length) lines.push(innKpp.join(' / '));
-  if (val(x.ogrn)) lines.push('ОГРН: ' + e(x.ogrn));
-  if (val(x.address)) lines.push('Адрес: ' + e(x.address));
-  if (val(x.rs)) lines.push('Р/с: ' + e(x.rs));
-  if (val(x.bank)) lines.push('Банк: ' + e(x.bank));
+  if (req(x.ogrn)) lines.push('ОГРН: ' + e(req(x.ogrn)));
+  if (req(x.address)) lines.push('Адрес: ' + e(req(x.address)));
+  if (req(x.rs)) lines.push('Р/с: ' + e(req(x.rs)));
+  if (req(x.bank)) lines.push('Банк: ' + e(req(x.bank)));
   const bikKs = [];
-  if (val(x.bik)) bikKs.push('БИК: ' + e(x.bik));
-  if (val(x.ks)) bikKs.push('К/с: ' + e(x.ks));
+  if (req(x.bik)) bikKs.push('БИК: ' + e(req(x.bik)));
+  if (req(x.ks)) bikKs.push('К/с: ' + e(req(x.ks)));
   if (bikKs.length) lines.push(bikKs.join(' · '));
   const contact = [];
-  if (val(x.phone)) contact.push(e(x.phone));
-  if (val(x.email)) contact.push(e(x.email));
+  if (req(x.phone)) contact.push(e(req(x.phone)));
+  if (req(x.email)) contact.push(e(req(x.email)));
   if (contact.length) lines.push(contact.join(' · '));
   return lines;
 }
@@ -149,20 +163,20 @@ function buyerFullRequisites(b) {
   const x = b || {};
   const lines = [];
   const innKpp = [];
-  if (val(x.inn)) innKpp.push('ИНН: ' + e(x.inn));
-  if (val(x.kpp)) innKpp.push('КПП: ' + e(x.kpp));
+  if (req(x.inn)) innKpp.push('ИНН: ' + e(req(x.inn)));
+  if (req(x.kpp)) innKpp.push('КПП: ' + e(req(x.kpp)));
   if (innKpp.length) lines.push(innKpp.join(' / '));
-  if (val(x.ogrn)) lines.push('ОГРН: ' + e(x.ogrn));
-  if (val(x.address)) lines.push('Адрес: ' + e(x.address));
-  if (val(x.rs)) lines.push('Р/с: ' + e(x.rs));
-  if (val(x.bank)) lines.push('Банк: ' + e(x.bank));
+  if (req(x.ogrn)) lines.push('ОГРН: ' + e(req(x.ogrn)));
+  if (req(x.address)) lines.push('Адрес: ' + e(req(x.address)));
+  if (req(x.rs)) lines.push('Р/с: ' + e(req(x.rs)));
+  if (req(x.bank)) lines.push('Банк: ' + e(req(x.bank)));
   const bikKs = [];
-  if (val(x.bik)) bikKs.push('БИК: ' + e(x.bik));
-  if (val(x.ks)) bikKs.push('К/с: ' + e(x.ks));
+  if (req(x.bik)) bikKs.push('БИК: ' + e(req(x.bik)));
+  if (req(x.ks)) bikKs.push('К/с: ' + e(req(x.ks)));
   if (bikKs.length) lines.push(bikKs.join(' / '));
   const contact = [];
-  if (val(x.phone)) contact.push(e(x.phone));
-  if (val(x.email)) contact.push(e(x.email));
+  if (req(x.phone)) contact.push(e(req(x.phone)));
+  if (req(x.email)) contact.push(e(req(x.email)));
   if (contact.length) lines.push(contact.join(' · '));
   return lines;
 }

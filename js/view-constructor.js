@@ -958,6 +958,23 @@ function validateBeforePreview(ctx){
   if (!String((kp.buyer && kp.buyer.name) || '').trim()) warn.push('покупатель не указан');
   if (!String(kp.client_request_no || '').trim()) warn.push('нет № обращения');
   if (items.some(it => !n(it.price))) warn.push('есть позиции с нулевой ценой');
+
+  // Реквизиты продавца в документе для юрлица. Незаполненное поле и оставшаяся
+  // заглушка 'TODO' из стартового каталога равнозначны: в документ строка не попадёт,
+  // а в оферте её отсутствие — повод не принять счёт к оплате.
+  if (kp.doc_variant === 'kp' || kp.doc_variant === 'oferta'){
+    const org = orgs.find(o => o.id === kp.org_id) || {};
+    const filled = v => { const s = String(v == null ? '' : v).trim();
+      return !!s && !/^(todo|tbd|xxx+|-{1,}|—|н\/д|нет данных)$/i.test(s); };
+    const need = kp.doc_variant === 'oferta'
+      ? [['inn','ИНН'], ['ogrn','ОГРН'], ['rs','р/с'], ['bank','банк'], ['bik','БИК'], ['ks','к/с']]
+      : [['inn','ИНН'], ['ogrn','ОГРН']];
+    const missing = need.filter(([k]) => !filled(org[k])).map(([, label]) => label);
+    if (missing.length){
+      warn.push('у продавца «' + (org.name || '—') + '» не заполнены реквизиты: ' + missing.join(', ')
+        + ' (заполняются в «Админ» → «Организации»)');
+    }
+  }
   if (warn.length){
     return confirm('Можно продолжить, но: ' + warn.join('; ') + '.\nОткрыть предпросмотр всё равно?');
   }
