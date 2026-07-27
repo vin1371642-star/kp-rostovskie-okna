@@ -79,13 +79,18 @@ function makeServiceNameSelect(ctx, it){
     if (sel.value === '__new__'){
       const name = (prompt('Название новой услуги:') || '').trim();
       if (name){
+        // Название пишем в позицию и сохраняем КП ДО saveSettings: тот вызывает emit(),
+        // экран перерисовывается целиком, и ctx/it после него уже «мертвы» —
+        // присваивание it.name раньше терялось, строка оставалась без названия.
+        it.name = name;
+        await persist(ctx, true);
         const cur = serviceList();
         if (!cur.includes(name)){
           const s = Object.assign({}, state.settings, { service_items: [...cur, name] });
           s.id = 'app';
-          try { await saveSettings(s); } catch (e){ console.error('[service add]', e); }
+          try { await saveSettings(s); return; } // перерисовку сделает emit()
+          catch (e){ console.error('[service add]', e); }
         }
-        it.name = name;
       }
       paint(ctx);
       return;
@@ -116,13 +121,16 @@ function makeMaterialNameSelect(ctx, it){
     if (sel.value === '__new__'){
       const name = (prompt('Название нового материала:') || '').trim();
       if (name){
+        // См. комментарий в makeServiceNameSelect: сохраняем КП до saveSettings/emit.
+        it.name = name;
+        await persist(ctx, true);
         const cur = materialList();
         if (!cur.includes(name)){
           const s = Object.assign({}, state.settings, { material_items: [...cur, name] });
           s.id = 'app';
-          try { await saveSettings(s); } catch (e){ console.error('[material add]', e); }
+          try { await saveSettings(s); return; } // перерисовку сделает emit()
+          catch (e){ console.error('[material add]', e); }
         }
-        it.name = name;
       }
       paint(ctx);
       return;
@@ -289,6 +297,13 @@ function buildHeaderCard(ctx){
           <button type="button" data-sk="off"${kp.show_sketches ? '' : ' class="on"'}>Выкл</button>
         </div>
       </div>
+      <div class="col field">
+        <label>Обложка (премиум)</label>
+        <div class="ctr-seg" data-cover-seg>
+          <button type="button" data-cover="on"${kp.hide_cover === true ? '' : ' class="on"'}>Вкл</button>
+          <button type="button" data-cover="off"${kp.hide_cover === true ? ' class="on"' : ''}>Выкл</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -348,6 +363,16 @@ function buildHeaderCard(ctx){
       kp.show_sketches = b.dataset.sk === 'on';
       persist(ctx, true);
       paint(ctx); // перерисовать разделы, чтобы колонка «Эскиз» появилась/скрылась сразу
+    });
+  });
+
+  // Сегмент «Обложка»: скрывает фирменное фото в шапке премиум-варианта —
+  // например когда презентацию несут фото самого объекта.
+  card.querySelectorAll('[data-cover-seg] button').forEach(b => {
+    b.addEventListener('click', () => {
+      kp.hide_cover = b.dataset.cover === 'off';
+      paint(ctx);
+      persist(ctx, true);
     });
   });
 
@@ -424,7 +449,7 @@ function buildObjectPhotos(ctx, host){
   function renderGrid(){
     grid.innerHTML = '';
     kp.object_photos.forEach((src, i) => {
-      const cell = el(`<div class="ctr-photo"><img src="${src}" alt=""><button class="ctr-photo-x" type="button" title="Убрать">✕</button></div>`);
+      const cell = el(`<div class="ctr-photo"><img src="${escapeHtml(src)}" alt=""><button class="ctr-photo-x" type="button" title="Убрать">✕</button></div>`);
       cell.querySelector('.ctr-photo-x').addEventListener('click', () => { kp.object_photos.splice(i, 1); renderGrid(); persist(ctx, true); });
       grid.appendChild(cell);
     });
@@ -464,6 +489,10 @@ function buildSection(ctx, section){
   const isProduct = section === 'product'; // только у продукции есть эскизы
   // Колонка «Эскиз» показывается лишь у продукции и при включённом тумблере эскизов.
   const sketchCol = isProduct && ctx.kp.show_sketches !== false;
+  // Средняя колонка: «Размер» у продукции, «Основание» у услуг. У доп. материалов
+  // размера нет — остаются наименование, кол-во, ед. изм., цена за ед. и сумма.
+  const midCol = isProduct || isService;
+  const colCount = 5 + (sketchCol ? 1 : 0) + (midCol ? 1 : 0) + 1; // +1 — служебная колонка действий
   const wrap = el(`<div class="card ctr-sec"></div>`);
 
   const head = el(`
@@ -482,9 +511,9 @@ function buildSection(ctx, section){
     <table class="table">
       <thead>
         <tr>
-          <th style="width:${sketchCol ? 27 : 34}%">Наименование</th>
+          <th style="width:${sketchCol ? 27 : (midCol ? 34 : 40)}%">Наименование</th>
           ${sketchCol ? '<th style="width:9%">Эскиз</th>' : ''}
-          <th style="width:13%">${isService ? 'Основание' : 'Размер'}</th>
+          ${midCol ? `<th style="width:13%">${isService ? 'Основание' : 'Размер'}</th>` : ''}
           <th style="width:8%" class="right">Кол-во</th>
           <th style="width:9%">Ед.</th>
           <th style="width:12%" class="right">Цена</th>
@@ -498,7 +527,7 @@ function buildSection(ctx, section){
   const rows = sectionItems(ctx, section);
 
   if (!rows.length){
-    tbody.appendChild(el(`<tr class="ctr-empty-row"><td colspan="${sketchCol ? 8 : 7}">${cfg.empty}</td></tr>`));
+    tbody.appendChild(el(`<tr class="ctr-empty-row"><td colspan="${colCount}">${cfg.empty}</td></tr>`));
   } else {
     rows.forEach(it => tbody.appendChild(buildRow(ctx, it, section)));
   }
@@ -541,7 +570,7 @@ function buildRow(ctx, it, section){
     const renderSk = () => {
       skBtn.classList.toggle('has-img', !!it.sketch_img);
       skBtn.innerHTML = it.sketch_img
-        ? `<img src="${it.sketch_img}" alt="эскиз">`
+        ? `<img src="${escapeHtml(it.sketch_img)}" alt="эскиз">`
         : `<span class="ctr-sketch-add">+ эскиз</span>`;
     };
     renderSk();
@@ -550,19 +579,21 @@ function buildRow(ctx, it, section){
     tr.appendChild(tdSketch);
   }
 
-  // Размер (товары) или Основание (услуга).
-  const tdSecond = el('<td></td>');
-  if (isGoods){
-    tdSecond.appendChild(makeCellInput(it.size_wh || '', v => { it.size_wh = v; }, ctx, 'text', 'напр. 1300×1400'));
-  } else {
-    const sel = el(`<select class="ctr-cell-input">
-      <option value="">—</option>
-      ${baseList().map(b => `<option value="${escapeHtml(b)}"${it.basis === b ? ' selected' : ''}>${escapeHtml(b)}</option>`).join('')}
-    </select>`);
-    sel.addEventListener('change', () => { it.basis = sel.value; persist(ctx, true); });
-    tdSecond.appendChild(sel);
+  // Размер (продукция) или Основание (услуга). У доп. материалов колонки нет.
+  if (isProduct || isService){
+    const tdSecond = el('<td></td>');
+    if (isProduct){
+      tdSecond.appendChild(makeCellInput(it.size_wh || '', v => { it.size_wh = v; }, ctx, 'text', 'напр. 1300×1400'));
+    } else {
+      const sel = el(`<select class="ctr-cell-input">
+        <option value="">—</option>
+        ${baseList().map(b => `<option value="${escapeHtml(b)}"${it.basis === b ? ' selected' : ''}>${escapeHtml(b)}</option>`).join('')}
+      </select>`);
+      sel.addEventListener('change', () => { it.basis = sel.value; persist(ctx, true); });
+      tdSecond.appendChild(sel);
+    }
+    tr.appendChild(tdSecond);
   }
-  tr.appendChild(tdSecond);
 
   // Кол-во.
   const tdQty = el('<td class="right"></td>');
@@ -821,7 +852,7 @@ function openSketchModal(ctx, it){
   const zone = bg.querySelector('[data-sk-zone]');
   const HINT = 'Кликните сюда и нажмите Ctrl+V, либо перетащите картинку';
   function show(){
-    zone.innerHTML = img ? `<img src="${img}" alt="эскиз" style="max-width:100%;max-height:240px;display:block">` : HINT;
+    zone.innerHTML = img ? `<img src="${escapeHtml(img)}" alt="эскиз" style="max-width:100%;max-height:240px;display:block">` : HINT;
   }
   show();
   const stop = watchPasteImage(d => { img = d; show(); toast('Эскиз вставлен'); });
@@ -860,9 +891,15 @@ function buildTotals(ctx){
     <div class="ctr-tot-grid" data-tot></div>
   `;
   const disc = card.querySelector('[data-discount]');
+  // Скидка не может превышать стоимость изделий и материалов: ядро её всё равно обрежет,
+  // но раньше поле продолжало показывать введённое, и в документ уходила другая цифра.
+  const maxDiscount = () => { const t = computeKpTotals(ctx.kp, ctx.items); return t.productSubtotal + t.materialSubtotal; };
   disc.addEventListener('input', () => { ctx.kp.discount = Math.max(0, n(disc.value)); refreshTotals(ctx); });
   disc.addEventListener('change', () => {
-    ctx.kp.discount = Math.max(0, n(disc.value));
+    const asked = Math.max(0, n(disc.value));
+    const cap = maxDiscount();
+    if (asked > cap) toast('Скидка ограничена стоимостью изделий и материалов: ' + money(cap));
+    ctx.kp.discount = Math.min(asked, cap);
     disc.value = ctx.kp.discount;
     refreshTotals(ctx);
     persist(ctx, true);
@@ -898,7 +935,8 @@ function refreshTotals(ctx){
   const pay = ctx.root.querySelector('.tot-pay');
   if (pay){
     const t = computeKpTotals(ctx.kp, ctx.items);
-    pay.textContent = 'К оплате: ' + money(t.total);
+    // С НДС итог с копейками — чтобы панель совпадала с блоком итогов и с документом.
+    pay.textContent = 'К оплате: ' + (t.vatRate > 0 ? money2(t.total) : money(t.total));
   }
 }
 

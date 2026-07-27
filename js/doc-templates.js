@@ -5,7 +5,7 @@
 // чистым HTML с подстановкой реальных данных. Печать-CSS — внутри document-style.
 import { computeKpTotals } from './calc.js';
 import { amountInWords } from './amount-in-words.js';
-import { money, money2, num, fmtDate, escapeHtml } from './util.js';
+import { money, money2, num, numf, fmtDate, escapeHtml } from './util.js';
 
 // ---------------------------------------------------------------------------
 // Хелперы
@@ -30,7 +30,9 @@ const DOC_LABELS = {
   addr: 'Адрес объекта', valid: 'Действительно до',
   seller: 'Продавец', buyer: 'Покупатель',
   termProduce: 'Срок изготовления', termWarranty: 'Гарантия', termPayment: 'Условия оплаты',
+  photos: 'Фото объекта',
   colNum: '№', colName: 'Наименование / комплектация', colNameService: 'Наименование',
+  colNameMaterial: 'Наименование',
   colSketch: 'Эскиз', colSize: 'Размер, мм', colBasis: 'Основание',
   colQty: 'Кол-во', colUnit: 'Ед.', colPrice: 'Цена, ₽', colSum: 'Сумма, ₽',
 };
@@ -40,10 +42,11 @@ function L(key){ const v = _labels[key]; return (v != null && String(v).trim()) 
 // Список ярлыков для редактора в Настройках: ключ + человекочитаемое описание.
 export const DOC_LABEL_FIELDS = [
   ['secProducts', 'Раздел «Продукция»'], ['secMaterials', 'Раздел «Доп. материалы»'], ['secServices', 'Раздел «Услуги»'],
-  ['addr', 'Адрес объекта'], ['valid', 'Действительно до'],
+  ['addr', 'Адрес объекта'], ['photos', 'Заголовок «Фото объекта»'], ['valid', 'Действительно до'],
   ['seller', 'Сторона «Продавец»'], ['buyer', 'Сторона «Покупатель»'],
   ['termProduce', 'Условия: срок изготовления'], ['termWarranty', 'Условия: гарантия'], ['termPayment', 'Условия: оплата'],
   ['colNum', 'Колонка №'], ['colName', 'Колонка «Наименование» (продукция)'], ['colNameService', 'Колонка «Наименование» (услуги)'],
+  ['colNameMaterial', 'Колонка «Наименование» (доп. материалы)'],
   ['colSketch', 'Колонка «Эскиз»'], ['colSize', 'Колонка «Размер»'], ['colBasis', 'Колонка «Основание»'],
   ['colQty', 'Колонка «Кол-во»'], ['colUnit', 'Колонка «Ед.»'], ['colPrice', 'Колонка «Цена»'], ['colSum', 'Колонка «Сумма»'],
 ];
@@ -219,7 +222,9 @@ export const DOC_STYLE = `
 // ---------------------------------------------------------------------------
 
 // Шапка таблицы. variant: 'premium' (крупнее) | 'legal' (компактнее).
-function tableHead(isService, showSketch, variant, isProduct) {
+// showMid — показывать среднюю колонку «Размер» (продукция) / «Основание» (услуги).
+// У доп. материалов размера нет: остаются № · Наименование · Кол-во · Ед. · Цена · Сумма.
+function tableHead(isService, showSketch, variant, isProduct, showMid) {
   const big = variant === 'premium';
   const pad = big ? '10px 8px' : '9px 7px';
   const padL = big ? '10px 10px' : '9px 9px';
@@ -237,9 +242,11 @@ function tableHead(isService, showSketch, variant, isProduct) {
   const skHide = showSketch ? '' : 'display:none;';
   let cells = '';
   cells += th(`width:${wNo};`, 'center', e(L('colNum')));
-  cells += th('', 'left', e(isProduct ? L('colName') : L('colNameService')));
+  // Три раздела — три независимых ярлыка: раньше материалы делили подпись с услугами,
+  // и переименование заголовка для услуг незаметно меняло его и у материалов.
+  cells += th('', 'left', e(isProduct ? L('colName') : (isService ? L('colNameService') : L('colNameMaterial'))));
   cells += th(`width:${wSk};${skHide}`, 'center', e(L('colSketch')));
-  cells += th(`width:${wMid};`, 'center', e(isService ? L('colBasis') : L('colSize')));
+  if (showMid) cells += th(`width:${wMid};`, 'center', e(isService ? L('colBasis') : L('colSize')));
   cells += th(`width:${wQty};`, 'center', e(L('colQty')));
   cells += th(`width:${wUnit};`, 'center', e(L('colUnit')));
   cells += th(`width:${wPrice};`, 'right', e(L('colPrice')));
@@ -248,7 +255,7 @@ function tableHead(isService, showSketch, variant, isProduct) {
 }
 
 // Строка таблицы.
-function tableRow(item, idx, isService, showSketch, variant) {
+function tableRow(item, idx, isService, showSketch, variant, showMid) {
   const big = variant === 'premium';
   const pad = big ? '12px 8px' : '10px 7px';
   const padL = big ? '12px 10px' : '10px 9px';
@@ -260,14 +267,18 @@ function tableRow(item, idx, isService, showSketch, variant) {
 
   const name = e(val(item.name, 'Изделие'));
   const descr = val(item.descr);
-  const qty = num(item.qty == null ? 0 : item.qty);
+  // Кол-во и цена — с дробной частью: «12,6 м.п. × 4 500» при округлении до целого
+  // печаталось как «13 × 4 500», и клиент, перемножив, получал не ту сумму, что в строке.
+  const qty = numf(item.qty == null ? 0 : item.qty);
   const unit = e(val(item.unit, isService ? 'усл.' : 'шт'));
-  const price = num(item.price);
+  const price = numf(item.price);
   const amount = num(item.amount);
 
-  // Колонка «Размер» (продукция) / «Основание» (услуги).
-  let midCell;
-  if (isService) {
+  // Колонка «Размер» (продукция) / «Основание» (услуги); у материалов её нет.
+  let midCell = '';
+  if (!showMid) {
+    midCell = '';
+  } else if (isService) {
     const b = basisText(item.basis);
     const color = b.red ? '#B50900;font-weight:600;' : '#9a9895;';
     midCell = `<td style="padding:${pad};${bb}text-align:center;font-family:Montserrat,sans-serif;font-size:${big ? '11px' : '10.5px'};color:${color}vertical-align:top;">${b.html}</td>`;
@@ -292,17 +303,32 @@ function tableRow(item, idx, isService, showSketch, variant) {
 }
 
 // Итоговая строка раздела.
-function sectionTotalRow(label, sum, showSketch, variant) {
+function sectionTotalRow(label, sum, showSketch, variant, showMid) {
   const big = variant === 'premium';
   const pad = big ? '12px 10px' : '11px 9px';
   const labelFz = big ? '13px' : '12px';
   const sumFz = big ? '14px' : '13px';
-  // Колонок до «Сумма»: №, Наименование, [Эскиз], Размер/Основание, Кол-во, Ед., Цена = 6 или 7.
-  const span = showSketch ? 7 : 6;
+  // Колонок до «Сумма»: №, Наименование, Кол-во, Ед., Цена = 5, плюс необязательные
+  // «Эскиз» и «Размер/Основание». У материалов обеих нет → 5.
+  const span = 5 + (showSketch ? 1 : 0) + (showMid ? 1 : 0);
   return `<tr style="background:#F6F5F4;">
     <td colspan="${span}" style="padding:${pad};border-top:2px solid #2B2A29;text-align:right;font-family:Cuprum,sans-serif;font-weight:700;font-size:${labelFz};color:#2B2A29;text-transform:uppercase;letter-spacing:.03em;">${e(label)}</td>
     <td style="padding:${pad};border-top:2px solid #2B2A29;text-align:right;font-family:Cuprum,sans-serif;font-weight:700;font-size:${sumFz};color:#2B2A29;white-space:nowrap;font-variant-numeric:tabular-nums;">${num(sum)}</td>
   </tr>`;
+}
+
+// Блок «Фото объекта» — общий для премиум (физлицо) и юр/оферты: фото загружаются
+// в конструкторе независимо от типа документа, поэтому и печатаются в обоих.
+function objectPhotosBlock(kp, variant) {
+  const photos = Array.isArray(kp.object_photos) ? kp.object_photos.filter(Boolean) : [];
+  if (!photos.length) return '';
+  const big = variant === 'premium';
+  return `<div style="padding:${big ? '22px' : '14px'} 16mm 0;">
+    <div style="font-family:Montserrat,sans-serif;font-size:${big ? '10px' : '9.5px'};letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:8px;">${e(L('photos'))}</div>
+    <div data-keep style="display:grid;grid-template-columns:repeat(${photos.length === 1 ? 1 : 2},1fr);gap:10px;">
+      ${photos.map(src => `<img src="${e(src)}" alt="" style="width:100%;height:auto;max-height:${big ? '260px' : '240px'};object-fit:cover;border:1px solid #EDEDED;border-radius:6px;display:block;break-inside:avoid;">`).join('')}
+    </div>
+  </div>`;
 }
 
 // Заголовок раздела «Продукция» / «Услуги».
@@ -319,13 +345,13 @@ function sectionTitle(text, variant) {
 }
 
 // Полная таблица раздела (заголовок + thead + строки + итог).
-function sectionTable(title, rows, totalLabel, total, isService, showSketch, variant, isProduct) {
+function sectionTable(title, rows, totalLabel, total, isService, showSketch, variant, isProduct, showMid) {
   if (!rows.length) return '';
   let body = '';
-  rows.forEach((it, i) => { body += tableRow(it, i + 1, isService, showSketch, variant); });
-  body += sectionTotalRow(totalLabel, total, showSketch, variant);
+  rows.forEach((it, i) => { body += tableRow(it, i + 1, isService, showSketch, variant, showMid); });
+  body += sectionTotalRow(totalLabel, total, showSketch, variant, showMid);
   return sectionTitle(title, variant)
-    + `<table style="width:100%;border-collapse:collapse;">${tableHead(isService, showSketch, variant, isProduct)}<tbody>${body}</tbody></table>`;
+    + `<table style="width:100%;border-collapse:collapse;">${tableHead(isService, showSketch, variant, isProduct, showMid)}<tbody>${body}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -494,10 +520,13 @@ function renderPremium(kp, items, settings, org) {
     <div style="padding-left:36px;">${metaCol('Менеджер', e(mgrName) || '—', false)}</div>
   </div>`;
 
-  // Hero.
-  html += `<div style="margin-top:30px;border-top:1px solid #eae7e4;border-bottom:1px solid #eae7e4;">
-    <img src="${e(heroImg)}" alt="Пластиковые окна — Ростовские окна" style="display:block;width:100%;height:320px;object-fit:cover;object-position:center 42%;">
-  </div>`;
+  // Обложка (hero). Отключается в конкретном КП тумблером «Обложка» (kp.hide_cover),
+  // например когда презентацию несут фото самого объекта, а не фирменная картинка.
+  if (kp.hide_cover !== true){
+    html += `<div style="margin-top:30px;border-top:1px solid #eae7e4;border-bottom:1px solid #eae7e4;">
+      <img src="${e(heroImg)}" alt="Пластиковые окна — Ростовские окна" style="display:block;width:100%;height:320px;object-fit:cover;object-position:center 42%;">
+    </div>`;
+  }
 
   // Преимущества (статичный фирменный блок).
   const adv = (big, small) =>
@@ -524,11 +553,14 @@ function renderPremium(kp, items, settings, org) {
     </div>
   </div>`;
 
+  // Фото объекта (презентация) — под блоком «Подготовлено для», если загружены.
+  html += objectPhotosBlock(kp, 'premium');
+
   // Таблицы.
   html += `<div style="padding:0 16mm;">`;
-  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium', true);
-  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'premium', false);
-  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, false, 'premium', false);
+  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'premium', true, true);
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'premium', false, false);
+  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, false, 'premium', false, true);
   html += `</div>`;
 
   // Итоги.
@@ -669,23 +701,15 @@ function renderLegal(kp, items, settings, org) {
   </div>`;
 
   // Фото объекта (презентация) — под адресом, если загружены.
-  const photos = Array.isArray(kp.object_photos) ? kp.object_photos.filter(Boolean) : [];
-  if (photos.length){
-    html += `<div style="padding:14px 16mm 0;">
-      <div style="font-family:Montserrat,sans-serif;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#9a9895;font-weight:700;margin-bottom:8px;">Фото объекта</div>
-      <div data-keep style="display:grid;grid-template-columns:repeat(${photos.length === 1 ? 1 : 2},1fr);gap:10px;">
-        ${photos.map(src => `<img src="${e(src)}" alt="" style="width:100%;height:auto;max-height:240px;object-fit:cover;border:1px solid #EDEDED;border-radius:6px;display:block;break-inside:avoid;">`).join('')}
-      </div>
-    </div>`;
-  }
+  html += objectPhotosBlock(kp, 'legal');
 
   // Таблицы.
   html += `<div style="padding:18px 16mm 0;">`;
-  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal', true);
+  html += sectionTable(L('secProducts'), products, 'Итого по разделу «' + L('secProducts') + '»', totals.productSubtotal, false, showSketch, 'legal', true, true);
   html += `<div style="height:0;"></div>`;
-  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'legal', false);
+  html += sectionTable(L('secMaterials'), materials, 'Итого по разделу «' + L('secMaterials') + '»', totals.materialSubtotal, false, false, 'legal', false, false);
   html += `<div style="height:0;"></div>`;
-  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, false, 'legal', false);
+  html += sectionTable(L('secServices'), services, 'Итого по разделу «' + L('secServices') + '»', totals.serviceSubtotal, true, false, 'legal', false, true);
   html += `</div>`;
 
   // Итоги (с НДС).

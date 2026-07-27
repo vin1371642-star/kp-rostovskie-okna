@@ -71,9 +71,11 @@ export function computeKpTotals(kp, items) {
   const subtotal = productSubtotal + materialSubtotal + serviceSubtotal;
   // Скидка применяется к продукции И доп. материалам (на услуги НЕ распространяется)
   // и не может превышать их суммарную стоимость.
+  // Границы с двух сторон: отрицательная скидка (например, из вручную правленного .kp)
+  // не должна раздувать базу выше суммы позиций.
   const goodsSubtotal = productSubtotal + materialSubtotal;
-  const discount = Math.min(Math.round(n(k.discount)), goodsSubtotal);
-  const base = Math.max(0, goodsSubtotal - discount) + serviceSubtotal;
+  const discount = Math.min(Math.max(0, Math.round(n(k.discount))), goodsSubtotal);
+  const base = (goodsSubtotal - discount) + serviceSubtotal;
 
   // НДС можно полностью скрыть в конкретном КП (k.vat_show === false) — напр. для физлиц
   // при наличной оплате: НДС не считается и не отображается, итог = сумма КП.

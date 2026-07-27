@@ -29,11 +29,28 @@ export async function loadSettings(){
 export async function saveSettings(s){ s.id = 'app'; await dbPut('settings', s); state.settings = s; emit(); return s; }
 
 // Вход в режим администратора (полный «Админ» + редактор формул).
-// На СВОЁМ компьютере (localhost) — открывается сразу, без пароля. На публичной ссылке
-// (github.io) недоступен, поэтому сотрудники «Админ» не видят. Возвращает: 'ok' | 'nolocal'.
+// Доступен только на СВОЁМ компьютере (localhost) и только по паролю: на публичной
+// ссылке (github.io) режим не открывается вовсе, поэтому сотрудники «Админ» не видят.
+// Пароль хранится в settings.admin_password и в общий слой НЕ входит (см. share.js).
+// Возвращает: 'ok' | 'set' (пароль задан при первом входе) | 'wrong' | 'nolocal' | 'cancel'.
 export async function enterAdminMode(){
   const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
   if (!isLocal) return 'nolocal';
+  const s = state.settings || (await loadSettings());
+  const saved = String(s.admin_password || '');
+  if (!saved){
+    // Пароль ещё не задан — назначаем его при первом входе, иначе поле в настройках
+    // создавало ложное впечатление защиты, а вход оставался свободным.
+    const set = (prompt('Задайте пароль администратора (сотрудникам он не раздаётся):') || '').trim();
+    if (!set) return 'cancel';
+    state.adminMode = true;
+    s.admin_password = set;
+    await saveSettings(s); // saveSettings сам делает emit
+    return 'set';
+  }
+  const given = prompt('Пароль администратора:');
+  if (given == null) return 'cancel';
+  if (String(given) !== saved) return 'wrong';
   state.adminMode = true; emit();
   return 'ok';
 }

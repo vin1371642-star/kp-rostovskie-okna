@@ -1,5 +1,8 @@
 // Утилиты — общий контракт. НЕ редактировать в модулях-агентах.
 export function num(n){ return (Math.round(Number(n) || 0)).toLocaleString('ru-RU'); }
+// Число с дробной частью до 2 знаков (лишние нули убираются) — для количества «12,6 м.п.»
+// и цены за единицу: округление их до целого делало строку таблицы противоречивой.
+export function numf(n){ return (Number(n) || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 }); }
 export function money(n){ return num(n) + ' ₽'; }
 // Денежный формат с копейками (2 знака) — для НДС и итога с НДС.
 export function money2(n){ return (Number(n) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽'; }

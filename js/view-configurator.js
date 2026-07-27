@@ -2,7 +2,7 @@
 // Экспорт: openConfigurator(onAdd) — открывает модальное окно; по «Добавить в КП»
 // формирует item и вызывает onAdd(item), затем закрывает модалку.
 import { dbAll, dbPut, uid } from './db.js';
-import { modal, money, num, toast, el, watchPasteImage, readFileAsDataURL } from './util.js';
+import { modal, money, num, numf, toast, el, watchPasteImage, readFileAsDataURL } from './util.js';
 import { state } from './store.js';
 import { componentSum, retail } from './calc.js';
 import { openComponentForm } from './view-catalog.js';
@@ -89,7 +89,7 @@ export function openConfigurator(onAdd, existing) {
       <div class="col field"><label>Размер (Ш×В)</label>
         <input class="input" data-cfg="size" placeholder="напр. 1300×1400"></div>
       <div class="col field" style="max-width:140px"><label>Количество</label>
-        <input class="input" type="number" min="1" step="1" data-cfg="qty" value="1"></div>
+        <input class="input" type="number" min="0" step="any" data-cfg="qty" value="1"></div>
     </div>
     <div class="row">
       <div class="col field"><label>Закупочная цена за ед., ₽</label>
@@ -256,8 +256,11 @@ export function openConfigurator(onAdd, existing) {
     const purchase = Number(purchaseInp.value) || 0; // закупка вводится в КП (не из каталога)
     const markup = Number(markupInp.value) || 0;
     const unitPrice = retail(purchase, markup);     // розница за ед.
-    const qty = Math.max(0, Math.floor(Number(qtyInp.value) || 0));
-    const amount = unitPrice * qty;
+    // Дробное количество допустимо: единицы «м²» и «м.п.» встречаются постоянно,
+    // а Math.floor молча превращал 2,5 м² в 2. Сумму округляем до рубля, чтобы
+    // сумма строк раздела точно совпадала с его подытогом.
+    const qty = Math.max(0, Number(qtyInp.value) || 0);
+    const amount = Math.round(unitPrice * qty);
 
     calcBox.innerHTML = `
       <div class="cfg-flow">
@@ -267,7 +270,7 @@ export function openConfigurator(onAdd, existing) {
         <span class="cfg-arrow">→</span>
         <span>Розница за ед. <b>${money(unitPrice)}</b></span>
       </div>
-      <div class="cfg-total"><span>Сумма (${num(qty)} шт)</span><span>${money(amount)}</span></div>
+      <div class="cfg-total"><span>Сумма (${numf(qty)})</span><span>${money(amount)}</span></div>
     `;
     return { comps, purchase, markup, unitPrice, qty, amount };
   }
@@ -314,6 +317,15 @@ export function openConfigurator(onAdd, existing) {
     qtyInp.value = ex.qty != null ? ex.qty : 1;
     purchaseInp.value = ex.purchase_sum != null ? ex.purchase_sum : 0;
     markupInp.value = ex.markup_pct != null ? ex.markup_pct : defMarkup;
+    // Цену могли поправить вручную в таблице конструктора. recalc() ниже выводит её
+    // из закупки и наценки, поэтому подгоняем наценку под сохранённую цену —
+    // иначе «зашёл, ничего не тронул, сохранил» молча меняло цену изделия.
+    const exPurchase = Number(purchaseInp.value) || 0;
+    const exPrice = Number(ex.price);
+    if (exPurchase > 0 && Number.isFinite(exPrice) && exPrice > 0
+        && retail(exPurchase, Number(markupInp.value) || 0) !== Math.round(exPrice)){
+      markupInp.value = Math.round((exPrice / exPurchase - 1) * 10000) / 100;
+    }
     sketchImg = ex.sketch_img || '';
     showSketch();
     recalc();

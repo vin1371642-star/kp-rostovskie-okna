@@ -159,14 +159,26 @@ export async function importKpFile(file){
   const srcItems = Array.isArray(data.items) ? data.items : [];
   const now = new Date().toISOString();
   const newId = uid();
+  // Файл .kp — обычный JSON, его могли править вручную. Санируем то, что участвует
+  // в расчётах: иначе отрицательная скидка раздувает итог, а позиция с чужим
+  // section молча выпадает из всех подытогов, оставаясь в списке.
+  const num = (v, min) => { const x = Number(v); return Number.isFinite(x) ? Math.max(min, x) : min; };
+  const SECTIONS = ['product', 'material', 'service'];
   const kp = {
     ...srcKp,
     id: newId,
+    discount: num(srcKp.discount, 0),
+    vat_rate: num(srcKp.vat_rate, 0),
     created_at: srcKp.created_at || now,
     updated_at: now
   };
   await dbPut('kp', kp);
-  const list = srcItems.map((it, i) => ({ ...it, id: uid(), kp_id: newId, sort: i }));
+  const list = srcItems.map((it, i) => ({
+    ...it,
+    section: SECTIONS.includes(it && it.section) ? it.section : 'product',
+    amount: num(it && it.amount, 0),
+    id: uid(), kp_id: newId, sort: i
+  }));
   await dbReplaceByIndex('kp_items', 'kp_id', newId, list);
   return newId;
 }

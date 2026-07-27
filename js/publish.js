@@ -7,6 +7,7 @@ import { buildSharedBundle, applySharedBundle, encryptBundle, decryptBundle } fr
 const SHARED_URL = 'shared.json';
 
 async function getSettings(){ return (await dbGet('settings', 'app')) || { id: 'app' }; }
+const vnum = v => { const x = Number(v); return Number.isFinite(x) && x > 0 ? x : 0; };
 
 // Узнать версию, опубликованную по ссылке (открыто, без пароля). null — ничего не опубликовано.
 export async function fetchPublishedVersion(){
@@ -22,7 +23,10 @@ export async function fetchPublishedVersion(){
 export async function publishShared(password){
   if (!password) throw new Error('Не задан пароль доступа');
   const s = await getSettings();
-  const version = (s.published_version || 0) + 1;
+  // Считаем от максимума локальной и уже опубликованной версии: публикация с другой
+  // машины (или после переустановки) иначе начала бы счётчик заново и перезаписала свежую.
+  const published = await fetchPublishedVersion();
+  const version = Math.max(vnum(s.published_version), vnum(published)) + 1;
   const bundle = await buildSharedBundle();
   const payload = await encryptBundle({ version, published_at: new Date().toISOString(), data: bundle }, password);
   payload.version = version; // версия в открытом виде — для сравнения без пароля
@@ -30,6 +34,10 @@ export async function publishShared(password){
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-KP-Publish': '1' }, body: JSON.stringify(payload)
   });
   if (!res.ok) throw new Error('Публикация доступна только из локальной программы (хост не ответил)');
+  // Хост отвечает 200 и при неудавшемся git push — версию запоминаем только если
+  // по ссылке реально выложено, иначе локально числилась бы версия, которой нет в проде.
+  const info = await res.json().catch(() => ({}));
+  if (info && info.state === 'error') throw new Error('Не выложено по ссылке: ' + (info.msg || 'неизвестная ошибка'));
   s.published_version = version; s.access_password = password; s.id = 'app';
   await dbPut('settings', s);
   return version;

@@ -82,7 +82,7 @@ function buildToolbar(root, kps){
   search.placeholder = 'Поиск по № обращения или клиенту…';
   search.value = ui.q;
   search.style.maxWidth = '300px';
-  search.oninput = () => { ui.q = search.value; rerenderList(root); };
+  search.oninput = () => { ui.q = search.value; rerenderList(root, true); };
   bar.appendChild(search);
 
   const spacer = document.createElement('div');
@@ -292,7 +292,24 @@ async function createKp(){
 }
 
 // ---------- Хелперы ----------
-function rerenderList(root){ build(root); }
+// Перерисовка списка. build() пересобирает экран целиком (root.innerHTML = ''),
+// поэтому поле поиска теряло фокус после каждого символа — набрать фразу было нельзя.
+// Ввод дебаунсим и после пересборки возвращаем фокус с позицией курсора.
+let _reTimer = null;
+function rerenderList(root, restoreSearch){
+  if (!restoreSearch) return void build(root);
+  const active = document.activeElement;
+  const caret = active && active.selectionStart != null ? active.selectionStart : null;
+  clearTimeout(_reTimer);
+  _reTimer = setTimeout(() => {
+    build(root).then(() => {
+      const s = root.querySelector('input[type="search"]');
+      if (!s || document.activeElement === s) return;
+      s.focus();
+      if (caret != null){ try { s.setSelectionRange(caret, caret); } catch { /* не текстовое поле */ } }
+    });
+  }, 150);
+}
 
 function applyFilters(kps){
   const q = ui.q.trim().toLowerCase();

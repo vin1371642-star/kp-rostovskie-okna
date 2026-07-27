@@ -3,7 +3,9 @@
 import { dbAll, dbGet, dbPut, dbReplaceStore } from './db.js';
 
 // Хранилища общего слоя.
-export const SHARED_STORES = ['organizations', 'categories', 'components', 'product_kits', 'clients'];
+// `clients` сознательно НЕ раздаётся: справочник клиентов заполняет сам менеджер,
+// а режим «заменить целиком» (clear + put) стёр бы его вместе с каталогом.
+export const SHARED_STORES = ['organizations', 'categories', 'components', 'product_kits'];
 // Ключ слияния для режима «Добавить новое»: компоненты — по стабильному code, остальное — по id.
 const MERGE_KEY = { components: 'code' };
 // Поля настроек, входящие в общий слой (manager/access_password/published_version — личные, не раздаём).
@@ -44,10 +46,18 @@ async function addSharedBundle(bundle){
     if (!Array.isArray(bundle[s])) continue;
     const key = MERGE_KEY[s] || 'id';
     const existing = await dbAll(s);
-    const have = new Set(existing.map(r => r[key]).filter(v => v != null));
+    // Пустой ключ — не ключ: code у компонента необязателен, и один локальный компонент
+    // без кода раньше заставлял пропускать ВСЕ приходящие компоненты без кода.
+    const valid = v => v != null && v !== '';
+    const have = new Set(existing.map(r => r[key]).filter(valid));
+    const haveIds = new Set(existing.map(r => r.id).filter(valid));
     for (const row of bundle[s]){
       const k = row[key];
-      if (k != null && have.has(k)) continue; // уже есть — не трогаем
+      if (valid(k)){
+        if (have.has(k)) continue;            // уже есть по ключу слияния — не трогаем
+      } else if (haveIds.has(row.id)){
+        continue;                             // ключа нет — сверяем по id, чтобы не плодить дубли
+      }
       await dbPut(s, row);
     }
   }

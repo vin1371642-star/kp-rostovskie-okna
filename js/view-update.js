@@ -12,7 +12,7 @@ export function renderUpdate(root){
   const card = el('<div class="card" style="max-width:480px"></div>');
   card.innerHTML = `
     <div class="field"><label>Пароль доступа</label>
-      <input class="input" id="up-pwd" value="${escAttr((state.settings && state.settings.access_password) || '')}" placeholder="пароль (выдаёт руководитель)"></div>
+      <input class="input" id="up-pwd" type="password" autocomplete="off" value="${escAttr((state.settings && state.settings.access_password) || '')}" placeholder="пароль (выдаёт руководитель)"></div>
     <div class="field"><label>Режим</label>
       <select class="select" id="up-mode">
         <option value="replace">Заменить каталог целиком</option>

@@ -47,8 +47,15 @@ function savedFormulas(){ return Object.assign({}, DEFAULT_EXPR, (state.settings
 function evalFormula(expr, scope){
   if (typeof expr !== 'string' || !expr.trim()) throw new Error('пусто');
   if (/[^0-9\s+\-*/%().,?:<>=!&|a-zA-Z_]/.test(expr)) throw new Error('недопустимый символ');
+  // Обращение к свойству запрещено: точка допустима только в числах (0.5), не как «goods.foo».
+  if (/\.\s*[A-Za-z_]/.test(expr)) throw new Error('обращение к свойству запрещено');
   const ids = expr.match(/[A-Za-z_]\w*/g) || [];
-  for (const id of ids){ if (!(id in scope)) throw new Error('неизвестное имя «' + id + '»'); }
+  // Именно СВОИ свойства: оператор `in` видел унаследованные от Object.prototype,
+  // поэтому имена constructor / __proto__ / toString проходили фильтр, а через
+  // goods.constructor.constructor из new Function получался произвольный код —
+  // и он исполнялся у каждого менеджера, т.к. формулы раздаются по ссылке.
+  const own = Object.prototype.hasOwnProperty;
+  for (const id of ids){ if (!own.call(scope, id)) throw new Error('неизвестное имя «' + id + '»'); }
   const names = Object.keys(scope);
   const fn = new Function(...names, 'return (' + expr + ');'); // имена ограничены scope (см. проверку выше)
   const v = Number(fn(...names.map(k => scope[k])));
