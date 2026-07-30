@@ -6,7 +6,7 @@ import { dbAll } from './db.js';
 import { money, money2, num, escapeHtml, toast, el, modal, watchPasteImage, readFileAsDataURL } from './util.js';
 import { loadKp, saveKp, newKp } from './storage-kp.js';
 import { openConfigurator } from './view-configurator.js';
-import { computeKpTotals, componentSum, retail } from './calc.js';
+import { computeKpTotals, componentSum, retail, vatMode } from './calc.js';
 import { openPreview, printKp } from './print.js';
 
 // Локальные стили модуля (префикс .ctr-) — поверх классов theme.css.
@@ -216,7 +216,7 @@ function buildHeaderCard(ctx){
   const buyerType = kp.buyer_type === 'org' ? 'org' : 'person';
   const buyer = kp.buyer || (kp.buyer = {});
   const mgr = kp.manager || (kp.manager = { name: '', phone: '', position: '' });
-  const vatShow = kp.vat_show !== false;
+  const vMode = vatMode(kp);
 
   card.innerHTML = `
     <div class="h2">Конструктор КП</div>
@@ -286,8 +286,9 @@ function buildHeaderCard(ctx){
       <div class="col field">
         <label>НДС в документе</label>
         <div class="ctr-seg" data-vat-seg>
-          <button type="button" data-vat="show"${vatShow ? ' class="on"' : ''}>Показывать</button>
-          <button type="button" data-vat="hide"${vatShow ? '' : ' class="on"'}>Скрыть</button>
+          <button type="button" data-vat="line"${vMode === 'line' ? ' class="on"' : ''} title="Цены позиций без НДС, налог начисляется сверху отдельной строкой">Плюс НДС</button>
+          <button type="button" data-vat="included"${vMode === 'included' ? ' class="on"' : ''} title="Цены позиций уже с НДС, налог выделяется внутри итога">в т.ч. НДС</button>
+          <button type="button" data-vat="none"${vMode === 'none' ? ' class="on"' : ''} title="НДС не считается и не показывается">Без НДС</button>
         </div>
       </div>
       <div class="col field">
@@ -348,11 +349,16 @@ function buildHeaderCard(ctx){
     });
   });
 
-  // Сегмент «НДС в документе»: показывать / скрыть полностью.
+  // Сегмент «НДС в документе»: Плюс НДС / в т.ч. НДС / Без НДС.
+  // Legacy-поля vat_show и vat_display пишем следом — чтобы .kp, открытый в старой
+  // версии приложения, не потерял выбор пользователя.
   card.querySelectorAll('[data-vat-seg] button').forEach(b => {
     b.addEventListener('click', () => {
-      kp.vat_show = b.dataset.vat === 'show';
-      paint(ctx); // итоги пересчитываются (НДС появляется/исчезает)
+      const m = b.dataset.vat;
+      kp.vat_mode = m;
+      kp.vat_show = m !== 'none';
+      kp.vat_display = m === 'included' ? 'included' : 'line';
+      paint(ctx); // итоги пересчитываются (НДС появляется/исчезает/выделяется изнутри)
       persist(ctx, true);
     });
   });
@@ -910,15 +916,22 @@ function buildTotals(ctx){
 
 function fillTotals(ctx, host){
   const t = computeKpTotals(ctx.kp, ctx.items);
-  // Все суммы — без НДС. НДС считается от суммы КП (с учётом скидки) отдельной строкой,
-  // итог: Сумма КП без НДС + НДС = Сумма с НДС.
+  // Три режима вывода НДС (см. calc.vatMode):
+  //  'line'     — цены позиций без НДС, налог сверху строкой: Сумма без НДС + НДС = Сумма с НДС;
+  //  'included' — цены уже с НДС, налог выделяется изнутри: итог не меняется;
+  //  'none'     — налога нет.
   const hasVat = t.vatRate > 0;
+  const incl = t.vatMode === 'included';
   let rows = '';
   if (t.discount){
-    rows += `<div class="row-t"><span class="muted">Стоимость без НДС</span><span>${money(t.subtotal)}</span></div>`;
+    rows += `<div class="row-t"><span class="muted">Стоимость${hasVat ? (incl ? ' с НДС' : ' без НДС') : ''}</span><span>${money(t.subtotal)}</span></div>`;
     rows += `<div class="row-t"><span class="muted">Скидка</span><b>−${money(t.discount)}</b></div>`;
   }
-  if (hasVat){
+  if (hasVat && incl){
+    rows += `<div class="row-t"><span class="muted">Сумма КП без НДС</span><b>${money2(t.net)}</b></div>`;
+    rows += `<div class="row-t"><span class="muted">в т.ч. НДС ${num(t.vatRate)}%</span><b>${money2(t.vat)}</b></div>`;
+    rows += `<div class="row-t" style="font-size:15px;margin-top:4px"><span>Сумма с НДС</span><b>${money(t.total)}</b></div>`;
+  } else if (hasVat){
     rows += `<div class="row-t"><span class="muted">Сумма КП без НДС</span><b>${money(t.base)}</b></div>`;
     rows += `<div class="row-t"><span class="muted">Плюс НДС ${num(t.vatRate)}%</span><b>${money2(t.vat)}</b></div>`;
     rows += `<div class="row-t" style="font-size:15px;margin-top:4px"><span>Сумма с НДС</span><b>${money2(t.total)}</b></div>`;
@@ -935,8 +948,9 @@ function refreshTotals(ctx){
   const pay = ctx.root.querySelector('.tot-pay');
   if (pay){
     const t = computeKpTotals(ctx.kp, ctx.items);
-    // С НДС итог с копейками — чтобы панель совпадала с блоком итогов и с документом.
-    pay.textContent = 'К оплате: ' + (t.vatRate > 0 ? money2(t.total) : money(t.total));
+    // С НДС сверху итог с копейками — чтобы панель совпадала с блоком итогов и с документом.
+    // При «в т.ч. НДС» итог = сумме позиций, она в целых рублях: копейки не нужны.
+    pay.textContent = 'К оплате: ' + (t.vatRate > 0 && t.vatMode === 'line' ? money2(t.total) : money(t.total));
   }
 }
 

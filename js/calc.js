@@ -37,13 +37,28 @@ export function retail(purchase, markupPct) {
 }
 
 /**
+ * Способ вывода НДС в КП. Читается из kp.vat_mode; для старых КП, где его ещё нет,
+ * восстанавливается из прежних полей vat_show / vat_display.
+ *  'line'     — «Плюс НДС»: цены позиций БЕЗ НДС, НДС начисляется сверху отдельной строкой;
+ *  'included' — «в т.ч. НДС»: цены позиций уже С НДС, налог выделяется внутри итога;
+ *  'none'     — «Без НДС»: налог не считается и не показывается.
+ * @param {{vat_mode?:string, vat_show?:boolean, vat_display?:string}} kp
+ * @returns {'line'|'included'|'none'}
+ */
+export function vatMode(kp) {
+  const k = kp || {};
+  if (k.vat_mode === 'line' || k.vat_mode === 'included' || k.vat_mode === 'none') return k.vat_mode;
+  if (k.vat_show === false) return 'none';
+  return k.vat_display === 'included' ? 'included' : 'line';
+}
+
+/**
  * Итоги по КП.
- * Ставка НДС берётся из kp.vat_rate (0/5/22) и начисляется СВЕРХУ отдельной строкой.
- * kp.vat_show === false полностью убирает НДС из расчёта и из документа.
- * @param {{vat_rate?:number, vat_show?:boolean, discount?:number}} kp
+ * Ставка НДС берётся из kp.vat_rate (0/5/22), способ вывода — из kp.vat_mode (см. vatMode()).
+ * @param {{vat_rate?:number, vat_mode?:string, vat_show?:boolean, discount?:number}} kp
  * @param {Array<{section?:string, amount?:number}>} items
  * @returns {{productSubtotal:number, materialSubtotal:number, serviceSubtotal:number,
- *            subtotal:number, discount:number, base:number, vatRate:number,
+ *            subtotal:number, discount:number, base:number, net:number, vatRate:number,
  *            vatMode:string, vat:number, total:number}}
  */
 export function computeKpTotals(kp, items) {
@@ -77,16 +92,30 @@ export function computeKpTotals(kp, items) {
   const discount = Math.min(Math.max(0, Math.round(n(k.discount))), goodsSubtotal);
   const base = (goodsSubtotal - discount) + serviceSubtotal;
 
-  // НДС можно полностью скрыть в конкретном КП (k.vat_show === false) — напр. для физлиц
-  // при наличной оплате: НДС не считается и не отображается, итог = сумма КП.
-  const vatShown = k.vat_show !== false;
-  const vatRate = vatShown ? n(k.vat_rate) : 0;
-  // НДС начисляется СВЕРХУ на сумму КП (база со скидкой): СуммаКП × ставка / 100,
-  // с копейками (2 знака, без округления до рубля). Итог: Сумма КП без НДС + НДС = Сумма с НДС.
-  // Цены позиций указаны БЕЗ НДС. Обратная сверка для бухгалтерии сходится:
-  // НДС, содержащийся в итоге, = Итог × ставка / (100 + ставка) — то же самое число.
-  const vat = vatRate > 0 ? Math.round(base * vatRate) / 100 : 0;
-  const total = Math.round((base + vat) * 100) / 100;
+  // Способ вывода НДС. 'none' — напр. для физлиц при наличной оплате: НДС не считается
+  // и не отображается, итог = сумма КП.
+  const mode = vatMode(k);
+  const vatRate = mode === 'none' ? 0 : n(k.vat_rate);
+
+  // vat  — сумма налога, с копейками (2 знака, без округления до рубля);
+  // net   — сумма БЕЗ НДС; total — к оплате. Тождество net + vat = total верно в любом режиме.
+  let vat = 0;
+  let net = base;
+  let total = base;
+  if (vatRate > 0 && mode === 'included') {
+    // Цены позиций уже включают НДС: налог ВЫДЕЛЯЕТСЯ изнутри базы по расчётной ставке
+    // ставка/(100+ставка). Итог не меняется — он и есть сумма КП с НДС.
+    vat = Math.round(base * vatRate * 100 / (100 + vatRate)) / 100;
+    net = Math.round((base - vat) * 100) / 100;
+    total = base;
+  } else if (vatRate > 0) {
+    // 'line' — цены позиций БЕЗ НДС, налог начисляется СВЕРХУ на сумму КП (база со скидкой).
+    // Обратная сверка для бухгалтерии сходится: НДС, содержащийся в итоге,
+    // = Итог × ставка / (100 + ставка) — то же самое число.
+    vat = Math.round(base * vatRate) / 100;
+    net = base;
+    total = Math.round((base + vat) * 100) / 100;
+  }
 
   return {
     productSubtotal,
@@ -95,8 +124,9 @@ export function computeKpTotals(kp, items) {
     subtotal,
     discount,
     base,
+    net,
     vatRate,
-    vatMode: 'line', // НДС всегда строкой сверху
+    vatMode: mode,
     vat,
     total,
   };

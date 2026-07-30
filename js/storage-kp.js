@@ -3,6 +3,7 @@
 import { dbAll, dbGet, dbPut, dbDel, dbByIndex, dbReplaceByIndex, uid } from './db.js';
 import { state } from './store.js';
 import { download, todayISO } from './util.js';
+import { vatMode } from './calc.js';
 
 // Убрать внутренние/несериализуемые поля перед записью в IndexedDB:
 // ключи с '_' (напр. _tr — ссылка на DOM-строку), функции и DOM-узлы.
@@ -37,8 +38,12 @@ export async function newKp(){
     doc_variant: 'premium',
     manager,
     show_sketches: true,
-    vat_display: 'line', // все суммы без НДС, НДС начисляется сверху отдельной строкой
-    vat_show: true,      // показывать НДС в КП (false — скрыть полностью, напр. физлицо/наличные)
+    // Способ вывода НДС: 'line' — «Плюс НДС» (цены без НДС, налог сверху строкой),
+    // 'included' — «в т.ч. НДС» (цены уже с НДС, налог выделяется внутри итога),
+    // 'none' — «Без НДС» (не считается и не показывается, напр. физлицо/наличные).
+    vat_mode: 'line',
+    vat_display: 'line', // legacy-поле, оставлено для .kp старых версий
+    vat_show: true,      // legacy-поле, оставлено для .kp старых версий
     vat_rate: org && org.vat_rate != null ? org.vat_rate : 0,
     object_address: '',
     valid_until: '',
@@ -169,6 +174,9 @@ export async function importKpFile(file){
     id: newId,
     discount: num(srcKp.discount, 0),
     vat_rate: num(srcKp.vat_rate, 0),
+    // .kp мог быть выгружен до появления трёх режимов НДС (или правлен вручную):
+    // приводим к текущему полю, восстанавливая режим из legacy vat_show/vat_display.
+    vat_mode: vatMode(srcKp),
     created_at: srcKp.created_at || now,
     updated_at: now
   };

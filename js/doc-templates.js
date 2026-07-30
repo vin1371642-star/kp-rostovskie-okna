@@ -432,22 +432,30 @@ function totalsBlock(kp, totals, variant) {
     </div>`;
 
   let rows = '';
-  // Все суммы — БЕЗ НДС. НДС считается от суммы КП (с учётом скидки) отдельной строкой:
-  // Сумма КП без НДС + НДС = Сумма с НДС.
+  // Три способа вывода НДС (kp.vat_mode, см. calc.vatMode):
+  //  'line'     — цены позиций БЕЗ НДС, налог начисляется сверху отдельной строкой:
+  //               Сумма КП без НДС + НДС = Сумма с НДС;
+  //  'included' — цены позиций уже С НДС, налог выделяется изнутри по расчётной ставке:
+  //               итог = сумме позиций со скидкой, в нём «в том числе НДС»;
+  //  'none'     — НДС не считается и не показывается.
   const hasVat = totals.vatRate > 0;
+  const incl = totals.vatMode === 'included';
 
   if (totals.discount > 0) {
-    rows += line('Стоимость без НДС', money(totals.subtotal));
+    rows += line('Стоимость' + (hasVat ? (incl ? ' с НДС' : ' без НДС') : ''), money(totals.subtotal));
     rows += line(variant === 'premium' ? 'Скидка по предложению' : 'Скидка по договору', '− ' + money(totals.discount), '#B50900');
   }
-  if (hasVat) {
+  if (hasVat && incl) {
+    rows += line('Сумма КП без НДС', money2(totals.net));
+    rows += line('В том числе НДС ' + num(totals.vatRate) + '%', money2(totals.vat), '#B50900');
+  } else if (hasVat) {
     rows += line('Сумма КП без НДС', money(totals.base));
     rows += line('Плюс НДС ' + num(totals.vatRate) + '%', money2(totals.vat), '#B50900');
   } else if (totals.discount > 0) {
-    rows += line('Сумма КП без НДС', money(totals.base));
+    rows += line('Сумма КП', money(totals.base));
   }
 
-  const totalLabel = hasVat ? 'Сумма с НДС' : 'Всего к оплате';
+  const totalLabel = hasVat ? (incl ? 'Всего с НДС' : 'Сумма с НДС') : 'Всего к оплате';
 
   return `<div data-keep style="padding:${big ? '26px' : '22px'} 16mm 0;">
     <div data-keep style="display:flex;justify-content:flex-end;">
@@ -455,7 +463,7 @@ function totalsBlock(kp, totals, variant) {
         ${rows}
         <div style="display:flex;justify-content:space-between;align-items:center;background:#B50900;color:#fff;padding:${big ? '14px 18px' : '13px 18px'};margin-top:8px;">
           <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${big ? '14px' : '13px'};text-transform:uppercase;letter-spacing:.03em;">${totalLabel}</span>
-          <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${big ? '22px' : '21px'};font-variant-numeric:tabular-nums;">${hasVat ? money2(totals.total) : money(totals.total)}</span>
+          <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${big ? '22px' : '21px'};font-variant-numeric:tabular-nums;">${hasVat && !incl ? money2(totals.total) : money(totals.total)}</span>
         </div>
       </div>
     </div>
