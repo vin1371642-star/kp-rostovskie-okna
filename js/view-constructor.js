@@ -918,19 +918,19 @@ function fillTotals(ctx, host){
   const t = computeKpTotals(ctx.kp, ctx.items);
   // Три режима вывода НДС (см. calc.vatMode):
   //  'line'     — цены позиций без НДС, налог сверху строкой: Сумма без НДС + НДС = Сумма с НДС;
-  //  'included' — цены уже с НДС, налог выделяется изнутри: итог не меняется;
+  //  'included' — цены уже с НДС: итог = сумме позиций, налог справочной строкой ПОД итогом
+  //               (строки «Сумма без НДС» нет — рядом с налогом она читалась бы как прибавление);
   //  'none'     — налога нет.
   const hasVat = t.vatRate > 0;
   const incl = t.vatMode === 'included';
   let rows = '';
   if (t.discount){
-    rows += `<div class="row-t"><span class="muted">Стоимость${hasVat ? (incl ? ' с НДС' : ' без НДС') : ''}</span><span>${money(t.subtotal)}</span></div>`;
+    rows += `<div class="row-t"><span class="muted">Стоимость${hasVat && !incl ? ' без НДС' : ''}</span><span>${money(t.subtotal)}</span></div>`;
     rows += `<div class="row-t"><span class="muted">Скидка</span><b>−${money(t.discount)}</b></div>`;
   }
   if (hasVat && incl){
-    rows += `<div class="row-t"><span class="muted">Сумма КП без НДС</span><b>${money2(t.net)}</b></div>`;
-    rows += `<div class="row-t"><span class="muted">в т.ч. НДС ${num(t.vatRate)}%</span><b>${money2(t.vat)}</b></div>`;
-    rows += `<div class="row-t" style="font-size:15px;margin-top:4px"><span>Сумма с НДС</span><b>${money(t.total)}</b></div>`;
+    rows += `<div class="row-t" style="font-size:15px;margin-top:4px"><span>Всего к оплате</span><b>${money(t.total)}</b></div>`;
+    rows += `<div class="row-t"><span class="muted">в том числе НДС ${num(t.vatRate)}%</span><b>${money2(t.vat)}</b></div>`;
   } else if (hasVat){
     rows += `<div class="row-t"><span class="muted">Сумма КП без НДС</span><b>${money(t.base)}</b></div>`;
     rows += `<div class="row-t"><span class="muted">Плюс НДС ${num(t.vatRate)}%</span><b>${money2(t.vat)}</b></div>`;

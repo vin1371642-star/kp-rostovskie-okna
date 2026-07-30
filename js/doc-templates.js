@@ -435,27 +435,32 @@ function totalsBlock(kp, totals, variant) {
   // Три способа вывода НДС (kp.vat_mode, см. calc.vatMode):
   //  'line'     — цены позиций БЕЗ НДС, налог начисляется сверху отдельной строкой:
   //               Сумма КП без НДС + НДС = Сумма с НДС;
-  //  'included' — цены позиций уже С НДС, налог выделяется изнутри по расчётной ставке:
-  //               итог = сумме позиций со скидкой, в нём «в том числе НДС»;
+  //  'included' — цены позиций уже С НДС: итог = сумме позиций со скидкой, а налог
+  //               выделяется ПОД итогом строкой «в том числе НДС»;
   //  'none'     — НДС не считается и не показывается.
   const hasVat = totals.vatRate > 0;
   const incl = totals.vatMode === 'included';
 
   if (totals.discount > 0) {
-    rows += line('Стоимость' + (hasVat ? (incl ? ' с НДС' : ' без НДС') : ''), money(totals.subtotal));
+    rows += line('Стоимость' + (hasVat && !incl ? ' без НДС' : ''), money(totals.subtotal));
     rows += line(variant === 'premium' ? 'Скидка по предложению' : 'Скидка по договору', '− ' + money(totals.discount), '#B50900');
   }
-  if (hasVat && incl) {
-    rows += line('Сумма КП без НДС', money2(totals.net));
-    rows += line('В том числе НДС ' + num(totals.vatRate) + '%', money2(totals.vat), '#B50900');
-  } else if (hasVat) {
+  if (hasVat && !incl) {
     rows += line('Сумма КП без НДС', money(totals.base));
     rows += line('Плюс НДС ' + num(totals.vatRate) + '%', money2(totals.vat), '#B50900');
-  } else if (totals.discount > 0) {
-    rows += line('Сумма КП', money(totals.base));
   }
+  // Без НДС строки «Сумма КП» нет: без налога она дословно повторяет итог под ней.
+  // При «в т.ч. НДС» строки «Сумма КП без НДС» нет намеренно: рядом с суммой налога она
+  // читается как «база + НДС = итог», то есть ровно как режим «Плюс НДС», хотя налог
+  // здесь ничего не прибавляет. Итог идёт первым, налог — под ним, справочной строкой.
 
-  const totalLabel = hasVat ? (incl ? 'Всего с НДС' : 'Сумма с НДС') : 'Всего к оплате';
+  const totalLabel = hasVat && !incl ? 'Сумма с НДС' : 'Всего к оплате';
+  const inclNote = hasVat && incl
+    ? `<div style="display:flex;justify-content:space-between;padding:${big ? '8px' : '7px'} ${big ? '18px' : '18px'} 0;">
+        <span style="font-family:Montserrat,sans-serif;font-size:${big ? '12.5px' : '12px'};color:#4a4846;">в том числе НДС ${num(totals.vatRate)}%</span>
+        <span style="font-family:Montserrat,sans-serif;font-size:${big ? '12.5px' : '12px'};font-weight:600;color:#B50900;font-variant-numeric:tabular-nums;">${money2(totals.vat)}</span>
+      </div>`
+    : '';
 
   return `<div data-keep style="padding:${big ? '26px' : '22px'} 16mm 0;">
     <div data-keep style="display:flex;justify-content:flex-end;">
@@ -465,6 +470,7 @@ function totalsBlock(kp, totals, variant) {
           <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${big ? '14px' : '13px'};text-transform:uppercase;letter-spacing:.03em;">${totalLabel}</span>
           <span style="font-family:Cuprum,sans-serif;font-weight:700;font-size:${big ? '22px' : '21px'};font-variant-numeric:tabular-nums;">${hasVat && !incl ? money2(totals.total) : money(totals.total)}</span>
         </div>
+        ${inclNote}
       </div>
     </div>
     <div style="margin-top:${big ? '14px' : '12px'};font-family:Montserrat,sans-serif;font-size:11.5px;color:#4a4846;background:#F6F5F4;padding:10px 16px;border-left:3px solid #B50900;">
