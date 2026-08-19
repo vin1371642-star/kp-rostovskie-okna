@@ -1,0 +1,17 @@
+
+# секреты — добавлено при аудите 19.08.2026
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.pfx
+*.p12
+id_rsa
+id_ed25519
+.npmrc
+.netrc
+.git-credentials
+credentials.json
+service-account*.json
